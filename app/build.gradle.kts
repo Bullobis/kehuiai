@@ -28,20 +28,35 @@ android {
             keyAlias = "kuaihuiai"
             keyPassword = "kuaihuiai2024"
         }
+        create("releaseSafe") {
+            storeFile = file("../releases/kuaihuiai.keystore")
+            storePassword = "kuaihuiai2024"
+            keyAlias = "kuaihuiai"
+            keyPassword = "kuaihuiai2024"
+        }
     }
 
     buildTypes {
         debug {
             isDebuggable = true
-            buildConfigField("boolean", "SAFE_MODE_DEFAULT", "false")
-            buildConfigField("String", "APP_NAME_SUFFIX", "\"\"")
         }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-            // 无安全模式
+        }
+    }
+
+    flavorDimensions += "mode"
+    productFlavors {
+        create("unsafe") {
+            dimension = "mode"
+            applicationIdSuffix = ".unsafe"
             buildConfigField("boolean", "SAFE_MODE_DEFAULT", "false")
-            buildConfigField("String", "APP_NAME_SUFFIX", "\"(无限制版)\"")
+        }
+        create("safe") {
+            dimension = "mode"
+            applicationIdSuffix = ".safe"
+            buildConfigField("boolean", "SAFE_MODE_DEFAULT", "true")
         }
     }
 
