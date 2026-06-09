@@ -3,6 +3,7 @@ package comkuaihuiai.data.repository
 import android.content.Context
 import android.util.Log
 import comkuaihuiai.data.model.*
+import comkuaihuiai.service.SafeModeManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
@@ -49,9 +50,25 @@ class GenerationRepository(private val context: Context) {
     }
     
     /**
-     * 文生图生成 (模拟)
+     * v2.4.0 安全检查
+     */
+    private fun performSafetyCheck(params: GenerationParams): SafeModeManager.SafetyResult {
+        return SafeModeManager.checkPrompts(params.positivePrompt, params.negativePrompt)
+    }
+    
+    /**
+     * 文生图生成
      */
     fun generateImage(params: GenerationParams): Flow<comkuaihuiai.data.model.GenerationProgress> = flow {
+        // v2.4.0 安全模式检查
+        val safetyResult = performSafetyCheck(params)
+        if (safetyResult is SafeModeManager.SafetyResult.UNSAFE) {
+            emit(comkuaihuiai.data.model.GenerationProgress.Error(
+                "⚠️ 内容安全检查未通过: ${safetyResult.reason}\n匹配关键词: ${safetyResult.matchedKeyword}\n\n提示：请修改提示词或关闭安全模式。"
+            ))
+            return@flow
+        }
+        
         emit(comkuaihuiai.data.model.GenerationProgress.Status("🔧 初始化推理引擎..."))
         
         val actualSeed = if (params.seed < 0) kotlin.random.Random.nextLong() else params.seed
