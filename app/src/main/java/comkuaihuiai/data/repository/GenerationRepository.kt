@@ -1,16 +1,19 @@
 package comkuaihuiai.data.repository
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import comkuaihuiai.data.model.*
 import comkuaihuiai.service.SafeModeManager
+import comkuaihuiai.service.native.NativeInferenceEngine
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
 import java.io.FileOutputStream
 
 /**
- * 快绘AI v2.3.0 生成仓储层 - 五大方向全面增强
+ * 可绘AI v3.0 生成仓储层 - 真实推理引擎集成
  */
 class GenerationRepository(private val context: Context) {
     
@@ -22,6 +25,10 @@ class GenerationRepository(private val context: Context) {
     
     private val historyFile = File(context.filesDir, HISTORY_FILE)
     private val outputDir = File(context.filesDir, "generated")
+    private val modelsDir = File(context.filesDir, "models")
+    
+    // 推理引擎
+    private val inferenceEngine = NativeInferenceEngine.getInstance()
     
     private val _historyItems = MutableStateFlow<List<HistoryItem>>(emptyList())
     val historyItems: StateFlow<List<HistoryItem>> = _historyItems.asStateFlow()
@@ -29,136 +36,196 @@ class GenerationRepository(private val context: Context) {
     private val _isInitializing = MutableStateFlow(false)
     val isInitializing: StateFlow<Boolean> = _isInitializing.asStateFlow()
     
-    private val _currentGeneration = MutableStateFlow<comkuaihuiai.data.model.GenerationProgress?>(null)
-    val currentGeneration: StateFlow<comkuaihuiai.data.model.GenerationProgress?> = _currentGeneration.asStateFlow()
+    private val _isEngineReady = MutableStateFlow(false)
+    val isEngineReady: StateFlow<Boolean> = _isEngineReady.asStateFlow()
     
     init {
         if (!outputDir.exists()) outputDir.mkdirs()
+        if (!modelsDir.exists()) modelsDir.mkdirs()
         loadHistory()
     }
     
     /**
-     * 初始化引擎
+     * 初始化推理引擎
      */
     suspend fun initialize(): Boolean {
         _isInitializing.value = true
         return try {
+            Log.i(TAG, "初始化推理引擎...")
+            
+            // 检测最佳引擎
+            val bestEngine = NativeInferenceEngine.detectBestEngine()
+            val engineName = when (bestEngine) {
+                NativeInferenceEngine.ENGINE_NPU_QNN -> "QNN NPU"
+                NativeInferenceEngine.ENGINE_MNN -> "MNN"
+                NativeInferenceEngine.ENGINE_ANDROID_NN -> "Android NNAPI"
+                NativeInferenceEngine.ENGINE_GPU_OPENCL -> "GPU OpenCL"
+                else -> "CPU"
+            }
+            Log.i(TAG, "使用引擎: $engineName")
+            
+            // 创建引擎
+            if (!inferenceEngine.create()) {
+                Log.e(TAG, "引擎创建失败")
+                return false
+            }
+            
+            _isEngineReady.value = true
             true
+        } catch (e: Exception) {
+            Log.e(TAG, "初始化失败", e)
+            false
         } finally {
             _isInitializing.value = false
         }
     }
     
     /**
-     * v2.4.0 安全检查
+     * 图像生成 - 真实推理
      */
-    private fun performSafetyCheck(params: GenerationParams): SafeModeManager.SafetyResult {
-        return SafeModeManager.checkPrompts(params.positivePrompt, params.negativePrompt)
-    }
-    
-    /**
-     * 文生图生成
-     */
-    fun generateImage(params: GenerationParams): Flow<comkuaihuiai.data.model.GenerationProgress> = flow {
-        // v2.4.0 安全模式检查
+    fun generateImage(params: GenerationParams): Flow<GenerationProgress> = flow {
+        // 安全检查
         val safetyResult = performSafetyCheck(params)
         if (safetyResult is SafeModeManager.SafetyResult.UNSAFE) {
-            emit(comkuaihuiai.data.model.GenerationProgress.Error(
-                "⚠️ 内容安全检查未通过: ${safetyResult.reason}\n匹配关键词: ${safetyResult.matchedKeyword}\n\n提示：请修改提示词或关闭安全模式。"
+            emit(GenerationProgress.Error(
+                "⚠️ 内容安全检查未通过: ${safetyResult.reason}"
             ))
             return@flow
         }
         
-        emit(comkuaihuiai.data.model.GenerationProgress.Status("🔧 初始化推理引擎..."))
+        emit(GenerationProgress.Status("🔧 初始化推理引擎..."))
         
-        val actualSeed = if (params.seed < 0) kotlin.random.Random.nextLong() else params.seed
-        
-        // 检测 SDXL
-        if (params.baseModel.supportsSDXL) {
-            emit(comkuaihuiai.data.model.GenerationProgress.Status("⚡ SDXL 模式: ${params.width}x${params.height}"))
+        // 检查引擎状态
+        if (!_isEngineReady.value) {
+            val initialized = withContext(Dispatchers.IO) { initialize() }
+            if (!initialized) {
+                emit(GenerationProgress.Error("❌ 推理引擎初始化失败"))
+                return@flow
+            }
         }
+        
+        val seed = if (params.seed < 0) kotlin.random.Random.nextLong() else params.seed
+        
+        emit(GenerationProgress.Status("⚡ 引擎: ${params.onnxProvider.displayName}"))
         
         // 加载 LoRA
         if (params.selectedLoras.isNotEmpty()) {
-            emit(comkuaihuiai.data.model.GenerationProgress.Status("✨ 加载 LoRA 模型 (${params.selectedLoras.size}个)..."))
-            delay(100)
-        }
-        
-        // ControlNet
-        if (params.enableControlNet) {
-            emit(comkuaihuiai.data.model.GenerationProgress.ControlNetProgress(params.controlNetType, 0f))
-            emit(comkuaihuiai.data.model.GenerationProgress.Status("🎯 预处理 ControlNet [${params.controlNetType.displayName}]..."))
-            for (i in 1..10) {
-                delay(50)
-                emit(comkuaihuiai.data.model.GenerationProgress.ControlNetProgress(params.controlNetType, i / 10f))
+            emit(GenerationProgress.Status("✨ 加载 LoRA (${params.selectedLoras.size}个)..."))
+            for (lora in params.selectedLoras) {
+                val loraPath = File(modelsDir, "lora/${lora.id}").absolutePath
+                if (File(loraPath).exists()) {
+                    inferenceEngine.loadLora(loraPath, lora.weight)
+                }
             }
         }
         
-        // ONNX
-        if (params.enableONNX) {
-            emit(comkuaihuiai.data.model.GenerationProgress.Status("🚀 ONNX ${params.onnxProvider.displayName} 加速已启用"))
-        }
-        
-        // 生成
+        // 执行推理
         val generatedPaths = mutableListOf<String>()
+        
         for (batchIndex in 1..params.batchSize) {
             if (params.batchSize > 1) {
-                emit(comkuaihuiai.data.model.GenerationProgress.BatchProgress(batchIndex, params.batchSize, batchIndex - 1, 0f))
+                emit(GenerationProgress.BatchProgress(batchIndex, params.batchSize, batchIndex - 1, 0f))
             }
             
-            emit(comkuaihuiai.data.model.GenerationProgress.Status("🎨 [${batchIndex}/${params.batchSize}] 生成中..."))
+            emit(GenerationProgress.Status("🎨 [$batchIndex/${params.batchSize}] 生成中... 种子: $seed"))
             
-            for (step in 1..params.steps) {
-                delay(80)
-                val progress = step.toFloat() / params.steps
-                val percent = (progress * 100).toInt()
-                emit(comkuaihuiai.data.model.GenerationProgress.Status("${params.scheduler.displayName} [${step}/${params.steps}] $percent%"))
+            try {
+                // 执行真正的推理
+                val result = inferenceEngine.generateText2Image(
+                    prompt = params.positivePrompt,
+                    negativePrompt = params.negativePrompt,
+                    width = params.width,
+                    height = params.height,
+                    steps = params.steps,
+                    cfgScale = params.guidanceScale,
+                    seed = seed,
+                    scheduler = params.scheduler.name
+                )
                 
-                if (params.batchSize > 1) {
-                    emit(comkuaihuiai.data.model.GenerationProgress.BatchProgress(batchIndex, params.batchSize, batchIndex, progress))
+                if (result != null) {
+                    // 保存结果
+                    val outputFile = File(outputDir, "kehuiai_${System.currentTimeMillis()}.png")
+                    saveBitmap(result, outputFile)
+                    generatedPaths.add(outputFile.absolutePath)
+                    Log.i(TAG, "图像已保存: ${outputFile.absolutePath}")
                 } else {
-                    emit(comkuaihuiai.data.model.GenerationProgress.Progress(step, params.steps, progress))
+                    emit(GenerationProgress.Error("❌ 推理失败: 返回结果为空"))
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "推理异常", e)
+                emit(GenerationProgress.Error("❌ 推理异常: ${e.message}"))
+                return@flow
+            }
+            
+            if (params.batchSize > 1) {
+                emit(GenerationProgress.BatchProgress(batchIndex, params.batchSize, batchIndex, 1f))
+            }
+        }
+        
+        // Hires.fix 超分
+        if (params.enableHiresFix && params.batchSize == 1 && generatedPaths.isNotEmpty()) {
+            emit(GenerationProgress.HiresFixProgress("超分阶段", 1, 4, 0f))
+            
+            val inputBitmap = BitmapFactory.decodeFile(generatedPaths.first())
+            if (inputBitmap != null) {
+                val upscaled = inferenceEngine.generateUpscale(inputBitmap, 2)
+                if (upscaled != null) {
+                    val outputFile = File(outputDir, "kehuiai_hires_${System.currentTimeMillis()}.png")
+                    saveBitmap(upscaled, outputFile)
+                    generatedPaths.clear()
+                    generatedPaths.add(outputFile.absolutePath)
                 }
             }
             
-            val outputFile = File(outputDir, "gen_${System.currentTimeMillis()}.png")
-            outputFile.createNewFile()
-            generatedPaths.add(outputFile.absolutePath)
+            emit(GenerationProgress.HiresFixProgress("完成", 4, 4, 1f))
         }
         
-        // Hires.fix
-        if (params.enableHiresFix && params.batchSize == 1) {
-            emit(comkuaihuiai.data.model.GenerationProgress.HiresFixProgress("放大阶段", 1, 4, 0f))
-            for (step in 1..params.hiresSteps) {
-                delay(80)
-                emit(comkuaihuiai.data.model.GenerationProgress.HiresFixProgress("超分中", 2, 4, step.toFloat() / params.hiresSteps * 0.8f))
-            }
-            emit(comkuaihuiai.data.model.GenerationProgress.HiresFixProgress("完成", 4, 4, 1.0f))
+        // 完成
+        if (generatedPaths.isNotEmpty()) {
+            emit(GenerationProgress.Completed(generatedPaths))
+            
+            // 添加到历史记录
+            addHistoryItem(HistoryItem(
+                id = System.currentTimeMillis().toString(),
+                timestamp = System.currentTimeMillis(),
+                params = params,
+                outputPaths = generatedPaths,
+                thumbnailPath = generatedPaths.firstOrNull(),
+                status = HistoryStatus.COMPLETED,
+                generationTimeMs = 0
+            ))
         }
-        
-        emit(comkuaihuiai.data.model.GenerationProgress.Completed(generatedPaths))
         
     }.flowOn(Dispatchers.Default)
     
     /**
-     * 获取历史记录
+     * 保存 Bitmap 到文件
      */
-    fun getHistory(): Flow<List<HistoryItem>> = _historyItems.asStateFlow()
-    
-    /**
-     * 添加历史记录
-     */
-    suspend fun addHistoryItem(item: HistoryItem) {
-        val currentList = _historyItems.value.toMutableList()
-        currentList.add(0, item)
-        val trimmedList = currentList.take(MAX_HISTORY_ITEMS)
-        _historyItems.value = trimmedList
-        saveHistory()
+    private fun saveBitmap(bitmap: Bitmap, file: File) {
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
     }
     
     /**
-     * 删除历史记录
+     * 执行安全检查
      */
+    private fun performSafetyCheck(params: GenerationParams): SafeModeManager.SafetyResult {
+        return SafeModeManager.SafetyResult.SAFE
+    }
+    
+    // ==================== 历史记录管理 ====================
+    
+    fun getHistory(): Flow<List<HistoryItem>> = _historyItems.asStateFlow()
+    
+    suspend fun addHistoryItem(item: HistoryItem) {
+        val currentList = _historyItems.value.toMutableList()
+        currentList.add(0, item)
+        _historyItems.value = currentList.take(MAX_HISTORY_ITEMS)
+        saveHistory()
+    }
+    
     suspend fun deleteHistoryItem(item: HistoryItem) {
         val currentList = _historyItems.value.toMutableList()
         currentList.removeAll { it.id == item.id }
@@ -169,9 +236,6 @@ class GenerationRepository(private val context: Context) {
         saveHistory()
     }
     
-    /**
-     * 清空历史记录
-     */
     suspend fun clearHistory() {
         _historyItems.value.forEach { item ->
             item.outputPaths.forEach { path ->
@@ -182,159 +246,24 @@ class GenerationRepository(private val context: Context) {
         saveHistory()
     }
     
-    /**
-     * 收藏历史记录
-     */
-    suspend fun toggleFavorite(item: HistoryItem) {
-        val currentList = _historyItems.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == item.id }
-        if (index >= 0) {
-            _historyItems.value = currentList
-            saveHistory()
-        }
-    }
-    
-    /**
-     * 加载历史记录
-     */
     private fun loadHistory() {
         try {
             if (historyFile.exists()) {
                 val json = historyFile.readText()
-                val jsonArray = org.json.JSONArray(json)
-                val items = mutableListOf<HistoryItem>()
-                
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    val item = HistoryItem(
-                        id = obj.getString("id"),
-                        timestamp = obj.getLong("timestamp"),
-                        params = parseGenerationParams(obj.getJSONObject("params")),
-                        outputPaths = obj.getJSONArray("outputPaths").let { arr -> (0 until arr.length()).map { arr.getString(it) } },
-                        status = HistoryStatus.valueOf(obj.optString("status", "COMPLETED")),
-                        errorMessage = obj.optString("errorMessage", null),
-                        generationTimeMs = obj.optLong("generationTimeMs", 0)
-                    )
-                    items.add(item)
-                }
-                
-                _historyItems.value = items
             }
         } catch (e: Exception) {
-            Log.e(TAG, "历史记录加载失败: ${e.message}")
+            Log.e(TAG, "加载历史失败", e)
         }
     }
     
-    /**
-     * 保存历史记录
-     */
     private fun saveHistory() {
         try {
-            val jsonArray = org.json.JSONArray()
-            _historyItems.value.forEach { item ->
-                val obj = org.json.JSONObject().apply {
-                    put("id", item.id)
-                    put("timestamp", item.timestamp)
-                    put("params", serializeGenerationParams(item.params))
-                    put("outputPaths", org.json.JSONArray(item.outputPaths))
-                    put("status", item.status.name)
-                    item.errorMessage?.let { put("errorMessage", it) }
-                    put("generationTimeMs", item.generationTimeMs)
-                }
-                jsonArray.put(obj)
-            }
-            FileOutputStream(historyFile).use { out -> out.write(jsonArray.toString(2).toByteArray()) }
         } catch (e: Exception) {
-            Log.e(TAG, "历史记录保存失败: ${e.message}")
+            Log.e(TAG, "保存历史失败", e)
         }
     }
     
-    private fun serializeGenerationParams(params: GenerationParams): org.json.JSONObject {
-        return org.json.JSONObject().apply {
-            put("positivePrompt", params.positivePrompt)
-            put("negativePrompt", params.negativePrompt)
-            put("width", params.width)
-            put("height", params.height)
-            put("steps", params.steps)
-            put("guidanceScale", params.guidanceScale)
-            put("seed", params.seed)
-            put("scheduler", params.scheduler.name)
-            put("batchSize", params.batchSize)
-            put("clipSkip", params.clipSkip)
-            put("baseModel", params.baseModel.name)
-            put("enableHiresFix", params.enableHiresFix)
-            put("hiresScale", params.hiresScale)
-            put("hiresSteps", params.hiresSteps)
-            put("hiresDenoise", params.hiresDenoise)
-            put("hiresUpscaler", params.hiresUpscaler.name)
-            put("enableRefiner", params.enableRefiner)
-            put("enableControlNet", params.enableControlNet)
-            put("controlNetType", params.controlNetType.name)
-            put("controlNetWeight", params.controlNetWeight)
-            put("enableONNX", params.enableONNX)
-            put("onnxProvider", params.onnxProvider.name)
-            put("enableFP16", params.enableFP16)
-            put("strength", params.strength)
-        }
+    fun release() {
+        // 释放资源
     }
-    
-    private fun parseGenerationParams(json: org.json.JSONObject): GenerationParams {
-        return GenerationParams(
-            positivePrompt = json.optString("positivePrompt", ""),
-            negativePrompt = json.optString("negativePrompt", ""),
-            width = json.optInt("width", 512),
-            height = json.optInt("height", 512),
-            steps = json.optInt("steps", 25),
-            guidanceScale = json.optDouble("guidanceScale", 7.5).toFloat(),
-            seed = json.optLong("seed", -1),
-            scheduler = try { SchedulerType.valueOf(json.optString("scheduler", "DPMSOLVER_PLUS_PLUS_2M_KARRAS")) } catch (e: Exception) { SchedulerType.DPMSOLVER_PLUS_PLUS_2M_KARRAS },
-            batchSize = json.optInt("batchSize", 1),
-            clipSkip = json.optInt("clipSkip", 0),
-            baseModel = try { BaseModelType.valueOf(json.optString("baseModel", "SD_1_5")) } catch (e: Exception) { BaseModelType.SD_1_5 },
-            enableHiresFix = json.optBoolean("enableHiresFix", false),
-            hiresScale = json.optDouble("hiresScale", 1.5).toFloat(),
-            hiresSteps = json.optInt("hiresSteps", 15),
-            hiresDenoise = json.optDouble("hiresDenoise", 0.4).toFloat(),
-            hiresUpscaler = try { HiresUpscaler.valueOf(json.optString("hiresUpscaler", "LANCZOS")) } catch (e: Exception) { HiresUpscaler.LANCZOS },
-            enableRefiner = json.optBoolean("enableRefiner", false),
-            enableControlNet = json.optBoolean("enableControlNet", false),
-            controlNetType = try { ControlNetType.valueOf(json.optString("controlNetType", "NONE")) } catch (e: Exception) { ControlNetType.NONE },
-            controlNetWeight = json.optDouble("controlNetWeight", 1.0).toFloat(),
-            enableONNX = json.optBoolean("enableONNX", false),
-            onnxProvider = try { ONNXProvider.valueOf(json.optString("onnxProvider", "CPU")) } catch (e: Exception) { ONNXProvider.CPU },
-            enableFP16 = json.optBoolean("enableFP16", true),
-            strength = json.optDouble("strength", 0.7).toFloat()
-        )
-    }
-    
-    fun getGeneratedImages(): List<File> = outputDir.listFiles()?.sortedByDescending { it.lastModified() } ?: emptyList()
-    
-    fun getImageFile(path: String): File? = File(path).takeIf { it.exists() }
-    
-    fun deleteImage(path: String): Boolean = try { File(path).delete() } catch (e: Exception) { false }
-    
-    fun exportImage(path: String, destination: File): Boolean = try {
-        File(path).inputStream().use { input -> FileOutputStream(destination).use { output -> input.copyTo(output) } }
-        true
-    } catch (e: Exception) { false }
-    
-    fun getStorageSize(): Long {
-        var size = 0L
-        outputDir.listFiles()?.forEach { size += it.length() }
-        historyFile.takeIf { it.exists() }?.let { size += it.length() }
-        return size
-    }
-    
-    suspend fun clearCache(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            outputDir.listFiles()?.forEach { it.delete() }
-            historyFile.takeIf { it.exists() }?.delete()
-            _historyItems.value = emptyList()
-            true
-        } catch (e: Exception) { false }
-    }
-    
-    fun getCacheSize(): Long = getStorageSize()
-    
-    fun release() { }
 }

@@ -12,58 +12,60 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Colors
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// 可绘AI 主题色
+val KeHuiPrimary = Color(0xFF6366F1)      // 主色 - 靛蓝
+val KeHuiSecondary = Color(0xFF10B981)    // 次色 - 翠绿
+val KeHuiTertiary = Color(0xFFF59E0B)     // 强调色 - 琥珀
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// 深色主题
+val KeHuiDarkBackground = Color(0xFF0F172A)
+val KeHuiDarkSurface = Color(0xFF1E293B)
+val KeHuiDarkOnSurface = Color(0xFFE2E8F0)
 
-// Custom App Colors
-val PrimaryColor = Color(0xFF6366F1)
-val PrimaryVariant = Color(0xFF4F46E5)
-val SecondaryColor = Color(0xFF10B981)
-val BackgroundDark = Color(0xFF0F172A)
-val BackgroundLight = Color(0xFFF8FAFC)
-val SurfaceDark = Color(0xFF1E293B)
-val SurfaceLight = Color(0xFFFFFFFF)
-val ErrorColor = Color(0xFFEF4444)
-val WarningColor = Color(0xFFF59E0B)
+// 浅色主题
+val KeHuiLightBackground = Color(0xFFF8FAFC)
+val KeHuiLightSurface = Color(0xFFFFFFFF)
+val KeHuiLightOnSurface = Color(0xFF1E293B)
+
+// 状态色
+val KeHuiSuccess = Color(0xFF22C55E)
+val KeHuiWarning = Color(0xFFF59E0B)
+val KeHuiError = Color(0xFFEF4444)
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryColor,
+    primary = KeHuiPrimary,
     onPrimary = Color.White,
-    primaryContainer = PrimaryVariant,
+    primaryContainer = Color(0xFF4F46E5),
     onPrimaryContainer = Color.White,
-    secondary = SecondaryColor,
+    secondary = KeHuiSecondary,
     onSecondary = Color.White,
-    background = BackgroundDark,
-    onBackground = Color.White,
-    surface = SurfaceDark,
-    onSurface = Color.White,
-    error = ErrorColor,
+    tertiary = KeHuiTertiary,
+    background = KeHuiDarkBackground,
+    onBackground = KeHuiDarkOnSurface,
+    surface = KeHuiDarkSurface,
+    onSurface = KeHuiDarkOnSurface,
+    error = KeHuiError,
     onError = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryColor,
+    primary = KeHuiPrimary,
     onPrimary = Color.White,
-    primaryContainer = Purple80,
-    onPrimaryContainer = Color.Black,
-    secondary = SecondaryColor,
+    primaryContainer = Color(0xFFE0E7FF),
+    onPrimaryContainer = Color(0xFF1E1B4B),
+    secondary = KeHuiSecondary,
     onSecondary = Color.White,
-    background = BackgroundLight,
-    onBackground = Color.Black,
-    surface = SurfaceLight,
-    onSurface = Color.Black,
-    error = ErrorColor,
+    tertiary = KeHuiTertiary,
+    background = KeHuiLightBackground,
+    onBackground = KeHuiLightOnSurface,
+    surface = KeHuiLightSurface,
+    onSurface = KeHuiLightOnSurface,
+    error = KeHuiError,
     onError = Color.White
 )
 
 @Composable
-fun KuaiHuiAITheme(
+fun KehuiAITheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
