@@ -14,11 +14,11 @@ android {
     }
 
     defaultConfig {
-        applicationId "comkuaihuiai.kuaihuiAI"
+        applicationId "com.kehui.ai"
         minSdk 24
         targetSdk 34
-        versionCode 300
-        versionName "3.0.0"
+        versionCode 301
+        versionName "3.0.1"
         
         ndk {
             abiFilters += "arm64-v8a"
@@ -38,6 +38,7 @@ android {
     buildTypes {
         debug {
             debuggable true
+            minifyEnabled false
         }
         release {
             minifyEnabled false
@@ -81,14 +82,14 @@ android {
 }
 
 dependencies {
-    // Core Android
+    // Core Android - 最新稳定版
     implementation 'androidx.core:core-ktx:1.13.1'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.0'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.2'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2'
     implementation 'androidx.activity:activity-compose:1.9.0'
     
-    // Compose BOM 2024
-    implementation platform('androidx.compose:compose-bom:2024.02.02')
+    // Compose BOM 2024.06.00 - 最新
+    implementation platform('androidx.compose:compose-bom:2024.06.00')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
@@ -96,25 +97,24 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended'
     implementation 'androidx.compose.foundation:foundation'
     
-    // Navigation
+    // Navigation - 最新
     implementation 'androidx.navigation:navigation-compose:2.7.7'
     
     // DataStore
     implementation 'androidx.datastore:datastore-preferences:1.1.1'
     
     // Coroutines
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
     
     // Networking
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     
-    // Image Loading
+    // Image Loading - Coil 2.x
     implementation 'io.coil-kt:coil-compose:2.6.0'
     
     // Protobuf
-    implementation 'com.google.protobuf:protobuf-javalite:3.25.2'
-    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.google.protobuf:protobuf-javalite:3.25.3'
     
     // Debug
     debugImplementation 'androidx.compose.ui:ui-tooling'

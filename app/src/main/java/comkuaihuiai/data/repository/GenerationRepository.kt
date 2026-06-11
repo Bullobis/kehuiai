@@ -13,7 +13,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * 可绘AI v3.0 生成仓储层 - 真实推理引擎集成
+ * 可绘AI v3.0.1 生成仓储层 - 真实推理引擎集成
  */
 class GenerationRepository(private val context: Context) {
     
@@ -27,7 +27,6 @@ class GenerationRepository(private val context: Context) {
     private val outputDir = File(context.filesDir, "generated")
     private val modelsDir = File(context.filesDir, "models")
     
-    // 推理引擎
     private val inferenceEngine = NativeInferenceEngine.getInstance()
     
     private val _historyItems = MutableStateFlow<List<HistoryItem>>(emptyList())
@@ -38,6 +37,9 @@ class GenerationRepository(private val context: Context) {
     
     private val _isEngineReady = MutableStateFlow(false)
     val isEngineReady: StateFlow<Boolean> = _isEngineReady.asStateFlow()
+    
+    private val _currentEngine = MutableStateFlow<EngineInfo?>(null)
+    val currentEngine: StateFlow<EngineInfo?> = _currentEngine.asStateFlow()
     
     init {
         if (!outputDir.exists()) outputDir.mkdirs()
@@ -51,29 +53,30 @@ class GenerationRepository(private val context: Context) {
     suspend fun initialize(): Boolean {
         _isInitializing.value = true
         return try {
-            Log.i(TAG, "初始化推理引擎...")
+            Log.i(TAG, "🚀 初始化推理引擎...")
             
-            // 检测最佳引擎
-            val bestEngine = NativeInferenceEngine.detectBestEngine()
-            val engineName = when (bestEngine) {
+            val bestEngineType = NativeInferenceEngine.detectBestEngine()
+            val engineName = when (bestEngineType) {
                 NativeInferenceEngine.ENGINE_NPU_QNN -> "QNN NPU"
                 NativeInferenceEngine.ENGINE_MNN -> "MNN"
                 NativeInferenceEngine.ENGINE_ANDROID_NN -> "Android NNAPI"
                 NativeInferenceEngine.ENGINE_GPU_OPENCL -> "GPU OpenCL"
                 else -> "CPU"
             }
-            Log.i(TAG, "使用引擎: $engineName")
             
-            // 创建引擎
+            Log.i(TAG, "⚡ 使用引擎: $engineName")
+            _currentEngine.value = EngineInfo(engineName, bestEngineType)
+            
             if (!inferenceEngine.create()) {
-                Log.e(TAG, "引擎创建失败")
+                Log.e(TAG, "❌ 引擎创建失败")
                 return false
             }
             
             _isEngineReady.value = true
+            Log.i(TAG, "✅ 引擎初始化完成")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "初始化失败", e)
+            Log.e(TAG, "❌ 初始化失败", e)
             false
         } finally {
             _isInitializing.value = false
@@ -84,18 +87,17 @@ class GenerationRepository(private val context: Context) {
      * 图像生成 - 真实推理
      */
     fun generateImage(params: GenerationParams): Flow<GenerationProgress> = flow {
+        val startTime = System.currentTimeMillis()
+        
         // 安全检查
         val safetyResult = performSafetyCheck(params)
         if (safetyResult is SafeModeManager.SafetyResult.UNSAFE) {
-            emit(GenerationProgress.Error(
-                "⚠️ 内容安全检查未通过: ${safetyResult.reason}"
-            ))
+            emit(GenerationProgress.Error("⚠️ 内容安全检查未通过: ${safetyResult.reason}"))
             return@flow
         }
         
         emit(GenerationProgress.Status("🔧 初始化推理引擎..."))
         
-        // 检查引擎状态
         if (!_isEngineReady.value) {
             val initialized = withContext(Dispatchers.IO) { initialize() }
             if (!initialized) {
@@ -121,16 +123,17 @@ class GenerationRepository(private val context: Context) {
         
         // 执行推理
         val generatedPaths = mutableListOf<String>()
+        var totalTime = 0L
         
         for (batchIndex in 1..params.batchSize) {
             if (params.batchSize > 1) {
                 emit(GenerationProgress.BatchProgress(batchIndex, params.batchSize, batchIndex - 1, 0f))
             }
             
+            val batchStart = System.currentTimeMillis()
             emit(GenerationProgress.Status("🎨 [$batchIndex/${params.batchSize}] 生成中... 种子: $seed"))
             
             try {
-                // 执行真正的推理
                 val result = inferenceEngine.generateText2Image(
                     prompt = params.positivePrompt,
                     negativePrompt = params.negativePrompt,
@@ -142,18 +145,20 @@ class GenerationRepository(private val context: Context) {
                     scheduler = params.scheduler.name
                 )
                 
+                val batchTime = System.currentTimeMillis() - batchStart
+                totalTime += batchTime
+                
                 if (result != null) {
-                    // 保存结果
                     val outputFile = File(outputDir, "kehuiai_${System.currentTimeMillis()}.png")
                     saveBitmap(result, outputFile)
                     generatedPaths.add(outputFile.absolutePath)
-                    Log.i(TAG, "图像已保存: ${outputFile.absolutePath}")
+                    Log.i(TAG, "✅ 图像已保存: ${outputFile.absolutePath} (${batchTime}ms)")
                 } else {
-                    emit(GenerationProgress.Error("❌ 推理失败: 返回结果为空"))
+                    emit(GenerationProgress.Error("❌ 推理失败"))
                 }
                 
             } catch (e: Exception) {
-                Log.e(TAG, "推理异常", e)
+                Log.e(TAG, "❌ 推理异常", e)
                 emit(GenerationProgress.Error("❌ 推理异常: ${e.message}"))
                 return@flow
             }
@@ -163,7 +168,7 @@ class GenerationRepository(private val context: Context) {
             }
         }
         
-        // Hires.fix 超分
+        // Hires.fix
         if (params.enableHiresFix && params.batchSize == 1 && generatedPaths.isNotEmpty()) {
             emit(GenerationProgress.HiresFixProgress("超分阶段", 1, 4, 0f))
             
@@ -183,9 +188,9 @@ class GenerationRepository(private val context: Context) {
         
         // 完成
         if (generatedPaths.isNotEmpty()) {
+            val totalGenerationTime = System.currentTimeMillis() - startTime
             emit(GenerationProgress.Completed(generatedPaths))
             
-            // 添加到历史记录
             addHistoryItem(HistoryItem(
                 id = System.currentTimeMillis().toString(),
                 timestamp = System.currentTimeMillis(),
@@ -193,14 +198,16 @@ class GenerationRepository(private val context: Context) {
                 outputPaths = generatedPaths,
                 thumbnailPath = generatedPaths.firstOrNull(),
                 status = HistoryStatus.COMPLETED,
-                generationTimeMs = 0
+                generationTimeMs = totalGenerationTime
             ))
+            
+            Log.i(TAG, "🎉 生成完成! 总耗时: ${totalGenerationTime}ms")
         }
         
     }.flowOn(Dispatchers.Default)
     
     /**
-     * 保存 Bitmap 到文件
+     * 保存 Bitmap
      */
     private fun saveBitmap(bitmap: Bitmap, file: File) {
         FileOutputStream(file).use { out ->
@@ -209,21 +216,19 @@ class GenerationRepository(private val context: Context) {
     }
     
     /**
-     * 执行安全检查
+     * 安全检查
      */
     private fun performSafetyCheck(params: GenerationParams): SafeModeManager.SafetyResult {
         return SafeModeManager.SafetyResult.SAFE
     }
     
-    // ==================== 历史记录管理 ====================
-    
+    // 历史记录管理
     fun getHistory(): Flow<List<HistoryItem>> = _historyItems.asStateFlow()
     
     suspend fun addHistoryItem(item: HistoryItem) {
         val currentList = _historyItems.value.toMutableList()
         currentList.add(0, item)
         _historyItems.value = currentList.take(MAX_HISTORY_ITEMS)
-        saveHistory()
     }
     
     suspend fun deleteHistoryItem(item: HistoryItem) {
@@ -233,7 +238,6 @@ class GenerationRepository(private val context: Context) {
         item.outputPaths.forEach { path ->
             try { File(path).delete() } catch (e: Exception) { }
         }
-        saveHistory()
     }
     
     suspend fun clearHistory() {
@@ -243,27 +247,11 @@ class GenerationRepository(private val context: Context) {
             }
         }
         _historyItems.value = emptyList()
-        saveHistory()
     }
     
-    private fun loadHistory() {
-        try {
-            if (historyFile.exists()) {
-                val json = historyFile.readText()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "加载历史失败", e)
-        }
-    }
+    private fun loadHistory() {}
     
-    private fun saveHistory() {
-        try {
-        } catch (e: Exception) {
-            Log.e(TAG, "保存历史失败", e)
-        }
-    }
-    
-    fun release() {
-        // 释放资源
-    }
+    fun release() {}
 }
+
+data class EngineInfo(val name: String, val type: Int)
