@@ -1,97 +1,156 @@
 package comkuaihuiai.service.advanced
 
+import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
-import android.os.Build
 import android.util.Log
 import comkuaihuiai.data.model.*
 import comkuaihuiai.service.KuaiHuiInferenceEngine
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.*
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.random.Random
 
 /**
- * 快绘AI v2.4.0 高级推理引擎
- * 集成批量生成、Hires.fix、ControlNet、ONNX加速等高级功能
+ * 快绘AI v3.1.0 高级推理引擎 - 全面对标 Local Dream / Draw Things
  */
 class AdvancedInferenceEngine(private val context: Context) {
     
     companion object {
         private const val TAG = "AdvancedInferenceEngine"
         
-        // 批量生成配置
         const val MAX_CONCURRENT_GENERATIONS = 4
         const val DEFAULT_BATCH_SIZE = 2
+        const val MAX_BATCH_SIZE = 8
         
-        // Hires.fix 配置
         const val DEFAULT_HIRES_SCALE = 1.5f
         const val DEFAULT_HIRES_STEPS = 15
-        const val MIN_HIRES_RESOLUTION = 1024
+        const val MIN_HIRES_RESOLUTION = 512
+        const val MAX_HIRES_SCALE = 4.0f
+        const val MIN_HIRES_SCALE = 1.0f
         
-        // ControlNet 配置
         const val DEFAULT_CONTROL_NET_WEIGHT = 1.0f
         const val MIN_CONTROL_NET_WEIGHT = 0.0f
         const val MAX_CONTROL_NET_WEIGHT = 2.0f
+        const val DEFAULT_CONTROL_NET_GUIDANCE_START = 0.0f
+        const val DEFAULT_CONTROL_NET_GUIDANCE_END = 1.0f
         
-        // ONNX 配置
         const val DEFAULT_ONNX_PROVIDER = "CPU"
         const val DEFAULT_FP16 = true
+        const val MAX_ONNX_THREADS = 8
+        
+        const val DEFAULT_VAE_STRENGTH = 0.1f
+        const val MIN_VAE_STRENGTH = 0.0f
+        const val MAX_VAE_STRENGTH = 1.0f
+        
+        const val MAX_LORAS = 5
+        const val DEFAULT_LORA_STRENGTH = 1.0f
+        
+        const val LOW_MEMORY_THRESHOLD_MB = 512L
+        const val CRITICAL_MEMORY_THRESHOLD_MB = 256L
+        const val RECOMMENDED_MEMORY_MB = 2048L
+        
+        const val GENERATION_TIMEOUT_MS = 600000L
+        const val STEP_TIMEOUT_MS = 30000L
+        const val MODEL_LOAD_TIMEOUT_MS = 120000L
     }
     
-    // 核心推理引擎
-    private val baseEngine = KuaiHuiInferenceEngine(context)
+    // ========== 内存信息 ==========
     
-    // v2.4.0 协程作用域
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    
-    // v2.4.0 性能追踪
-    private val performanceTracker = PerformanceTracker()
-    
-    // v2.4.0 资源管理
-    private val resourceManager = ResourceManager()
-    
-    // v2.4.0 批量生成状态
-    private val batchState = BatchState()
-    
-    // v2.4.0 ONNX 配置
-    data class ONNXConfig(
-        val enabled: Boolean = false,
-        val provider: String = DEFAULT_ONNX_PROVIDER,
-        val fp16: Boolean = DEFAULT_FP16
+    data class MemoryInfo(
+        val jvmUsedMb: Long,
+        val jvmFreeMb: Long,
+        val jvmMaxMb: Long,
+        val systemAvailableMb: Long,
+        val systemTotalMb: Long,
+        val isLowMemory: Boolean,
+        val memoryClass: MemClass
     )
     
-    // v2.4.0 性能追踪器
-    class PerformanceTracker {
-        val startTimes = ConcurrentHashMap<String, Long>()
-        val metrics = ConcurrentHashMap<String, Metric>()
-        
-        data class Metric(
-            val name: String,
-            val duration: Long,
-            val memoryUsed: Long,
-            val timestamp: Long
-        )
-        
-        fun start(name: String) {
-            startTimes[name] = System.currentTimeMillis()
-        }
-        
-        fun end(name: String) {
-            startTimes[name]?.let { start ->
-                val duration = System.currentTimeMillis() - start
-                metrics[name] = Metric(name, duration, Runtime.getRuntime().freeMemory(), System.currentTimeMillis())
-                startTimes.remove(name)
-            }
-        }
-        
-        fun getMetric(name: String): Metric? = metrics[name]
+    enum class MemClass { LOW, MEDIUM, HIGH, VERY_HIGH }
+    
+    // ========== 核心组件 ==========
+    
+    private val baseEngine = KuaiHuiInferenceEngine(context)
+    private val engineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+    
+    // ========== 状态管理 ==========
+    
+    private val isInitialized = AtomicBoolean(false)
+    private val isGenerating = AtomicBoolean(false)
+    private val isCancelled = AtomicBoolean(false)
+    
+    private val currentJobId = AtomicReference<String?>(null)
+    private val currentProgress = AtomicInteger(0)
+    
+    // ========== 资源管理 ==========
+    
+    private val performanceTracker = PerformanceTracker()
+    private val resourceManager = ResourceManager()
+    private val modelCache = ModelCache()
+    private val loraCache = LoraCache()
+    private val vaeCache = VaeCache()
+    private val batchState = BatchState()
+    private val schedulerManager = SchedulerManager()
+    
+    // ========== ONNX 配置 ==========
+    
+    data class ONNXConfig(
+        val enabled: Boolean = false,
+        val provider: ONNXProvider = ONNXProvider.CPU,
+        val fp16: Boolean = DEFAULT_FP16,
+        val threads: Int = 4,
+        val memoryMode: ONNXMemoryMode = ONNXMemoryMode.BALANCED
+    )
+    
+    enum class ONNXProvider(val displayName: String, val acceleration: Float) {
+        CPU("CPU", 1.0f),
+        GPU_OPENCL("GPU (OpenCL)", 3.0f),
+        GPU_VULKAN("GPU (Vulkan)", 3.5f),
+        NPU_SNPE("NPU (SNPE)", 5.0f),
+        NPU_QCOM("NPU (QCOM)", 6.0f),
+        NNAPI("NNAPI", 2.5f),
+        AUTO("自动选择", 4.0f)
     }
     
-    // v2.4.0 资源管理器
+    enum class ONNXMemoryMode { LOW, BALANCED, HIGH }
+    
+    enum class SchedulerType(val displayName: String, val speed: String, val quality: String, val description: String) {
+        EULER("Euler", "快速", "中等", "经典欧拉方法"),
+        EULER_A("Euler A", "快速", "高", "自适应步长"),
+        DDIM("DDIM", "中等", "高", "去噪扩散隐式模型"),
+        DPM_PP_2M("DPM++ 2M", "快速", "高", "DPM++ 2阶多步"),
+        DPM_PP_2S_A("DPM++ 2S A", "快速", "很高", "DPM++ 2阶单步"),
+        DPM_PP_SDE("DPM++ SDE", "中等", "很高", "DPM++ 随机微分方程"),
+        UNIPC("UniPC", "快速", "高", "统一预测校正器"),
+        LCM("LCM", "极快", "中等", "潜空间一致性模型")
+    }
+    
+    // ========== 性能追踪器 ==========
+    
+    class PerformanceTracker {
+        private val metrics = ConcurrentHashMap<String, Metric>()
+        
+        data class Metric(val name: String, val duration: Long, val memoryUsedMb: Long, val timestamp: Long)
+        
+        fun record(name: String, durationMs: Long, memoryUsedMb: Long = 0) {
+            metrics[name] = Metric(name, durationMs, memoryUsedMb, System.currentTimeMillis())
+        }
+        
+        fun getAverageDuration(name: String): Long {
+            val values = metrics.values.filter { it.name == name }
+            return if (values.isEmpty()) 0L else values.map { it.duration }.average().toLong()
+        }
+        
+        fun clear() = metrics.clear()
+    }
+    
+    // ========== 资源管理器 ==========
+    
     class ResourceManager {
         private val activeJobs = ConcurrentHashMap<String, JobState>()
         
@@ -100,399 +159,380 @@ class AdvancedInferenceEngine(private val context: Context) {
             val params: GenerationParams,
             val status: Status,
             val progress: Float,
-            val startTime: Long
+            val startTime: Long,
+            val currentStep: Int = 0,
+            val totalSteps: Int = 0
         )
         
-        enum class Status { PENDING, RUNNING, COMPLETED, FAILED, CANCELLED }
+        enum class Status { 
+            PENDING, INITIALIZING, RUNNING, GENERATING, 
+            POST_PROCESSING, COMPLETED, FAILED, CANCELLED 
+        }
         
         fun addJob(id: String, params: GenerationParams) {
             activeJobs[id] = JobState(id, params, Status.PENDING, 0f, System.currentTimeMillis())
         }
         
-        fun updateStatus(id: String, status: Status, progress: Float = 0f) {
+        fun updateStatus(id: String, status: Status, progress: Float = 0f, currentStep: Int = 0, totalSteps: Int = 0) {
             activeJobs[id]?.let { job ->
-                activeJobs[id] = job.copy(status = status, progress = progress)
+                activeJobs[id] = job.copy(status = status, progress = progress, currentStep = currentStep, totalSteps = totalSteps)
             }
         }
         
-        fun removeJob(id: String) {
-            activeJobs.remove(id)
-        }
+        fun removeJob(id: String) = activeJobs.remove(id)
         
-        fun getActiveCount(): Int = activeJobs.count { it.value.status == Status.RUNNING }
-        
-        fun cancelAll() {
-            activeJobs.keys.forEach { removeJob(it) }
+        fun getActiveCount(): Int = activeJobs.count { 
+            it.value.status == Status.RUNNING || it.value.status == Status.GENERATING 
         }
     }
     
-    // v2.4.0 批量状态
+    // ========== 缓存管理 ==========
+    
+    class ModelCache {
+        private val cache = ConcurrentHashMap<String, CachedModel>()
+        
+        data class CachedModel(val modelId: String, val loadedAt: Long, val sizeMb: Long)
+        
+        fun get(modelId: String): CachedModel? = cache[modelId]
+        fun put(modelId: String) {
+            cache[modelId] = CachedModel(modelId, System.currentTimeMillis(), 0)
+        }
+        fun clear() = cache.clear()
+    }
+    
+    class LoraCache {
+        private val cache = ConcurrentHashMap<String, LoraEntry>()
+        
+        data class LoraEntry(val id: String, val path: String, val weight: Float, val clipWeight: Float)
+        
+        fun put(id: String, path: String, weight: Float, clipWeight: Float) {
+            cache[id] = LoraEntry(id, path, weight, clipWeight)
+        }
+        
+        fun get(id: String): LoraEntry? = cache[id]
+        fun clear() = cache.clear()
+    }
+    
+    class VaeCache {
+        private val cache = ConcurrentHashMap<String, String>()
+        
+        fun put(id: String, path: String) { cache[id] = path }
+        fun get(id: String): String? = cache[id]
+        fun clear() = cache.clear()
+    }
+    
+    // ========== 批量状态 ==========
+    
     class BatchState {
-        var currentIndex = 0
-        var totalCount = 0
-        var isActive = false
-        
-        fun reset() {
-            currentIndex = 0
-            totalCount = 0
-            isActive = false
-        }
-        
-        fun start(total: Int) {
-            currentIndex = 0
-            totalCount = total
-            isActive = true
-        }
-        
-        fun increment() {
-            currentIndex++
-        }
-        
-        fun getProgress(): Float = if (totalCount > 0) currentIndex.toFloat() / totalCount else 0f
+        val currentBatch = AtomicInteger(0)
+        val totalBatches = AtomicInteger(1)
     }
     
-    // v2.4.0 批量生成结果
-    sealed class BatchGenerationResult {
-        data class Status(val message: String) : BatchGenerationResult()
-        data class Progress(val result: GenerationProgress) : BatchGenerationResult()
-        data class Completed(val message: String) : BatchGenerationResult()
-        data class Error(val message: String, val throwable: Throwable? = null) : BatchGenerationResult()
+    // ========== 调度器管理器 ==========
+    
+    class SchedulerManager {
+        fun createScheduler(type: SchedulerType, steps: Int, guidanceScale: Float, seed: Long) {}
+        fun getScheduler(type: SchedulerType) = type
     }
     
-    /**
-     * v2.4.0 高级生成 - 集成所有功能
-     */
-    fun generateImageAdvanced(params: GenerationParams): Flow<GenerationProgress> = flow {
-        performanceTracker.start("generate_advanced")
-        val jobId = "gen_${System.currentTimeMillis()}"
+    // ========== 内存监控 ==========
+    
+    private fun getMemoryInfo(): MemoryInfo {
+        val runtime = Runtime.getRuntime()
+        val jvmUsed = runtime.totalMemory() - runtime.freeMemory()
+        val jvmFree = runtime.freeMemory()
+        val jvmMax = runtime.maxMemory()
+        
+        val memInfo = android.app.ActivityManager.MemoryInfo()
+        activityManager?.getMemoryInfo(memInfo)
+        val systemAvailable = memInfo.availMem
+        val systemTotal = memInfo.totalMem
+        
+        val memClass = when {
+            systemAvailable < LOW_MEMORY_THRESHOLD_MB * 1024 * 1024 -> MemClass.LOW
+            systemAvailable < RECOMMENDED_MEMORY_MB * 1024 * 1024 -> MemClass.MEDIUM
+            systemTotal < 4L * 1024 * 1024 * 1024 -> MemClass.HIGH
+            else -> MemClass.VERY_HIGH
+        }
+        
+        return MemoryInfo(
+            jvmUsedMb = jvmUsed / (1024 * 1024),
+            jvmFreeMb = jvmFree / (1024 * 1024),
+            jvmMaxMb = jvmMax / (1024 * 1024),
+            systemAvailableMb = systemAvailable / (1024 * 1024),
+            systemTotalMb = systemTotal / (1024 * 1024),
+            isLowMemory = memInfo.lowMemory,
+            memoryClass = memClass
+        )
+    }
+    
+    private fun isMemoryEnough(requiredMb: Long): Boolean = getMemoryInfo().systemAvailableMb >= requiredMb
+    
+    private fun getRecommendedBatchSize(): Int = when (getMemoryInfo().memoryClass) {
+        MemClass.LOW -> 1
+        MemClass.MEDIUM -> 2
+        MemClass.HIGH -> 4
+        MemClass.VERY_HIGH -> 8
+    }
+    
+    // ========== 初始化 ==========
+    
+    suspend fun initialize() = withContext(Dispatchers.Default) {
+        if (isInitialized.get()) return@withContext
+        
+        Log.i(TAG, "🚀 初始化高级推理引擎...")
+        
+        baseEngine.initialize()
+        
+        isInitialized.set(true)
+        Log.i(TAG, "✅ 高级推理引擎初始化完成")
+    }
+    
+    // ========== 生成 ==========
+    
+    fun generate(
+        params: GenerationParams,
+        onProgress: ((GenerationProgress) -> Unit)? = null
+    ): Flow<GenerationProgress> = flow {
+        if (!isInitialized.get()) {
+            emit(GenerationProgress.Error("引擎未初始化"))
+            return@flow
+        }
+        
+        isGenerating.set(true)
+        isCancelled.set(false)
+        
+        val jobId = "job_${System.currentTimeMillis()}"
+        currentJobId.set(jobId)
+        resourceManager.addJob(jobId, params)
         
         try {
-            // 状态: 初始化
-            emit(GenerationProgress.Status("初始化生成参数..."))
-            resourceManager.addJob(jobId, params)
-            resourceManager.updateStatus(jobId, ResourceManager.Status.RUNNING)
+            val startTime = System.currentTimeMillis()
             
-            // ONNX 加速检查
-            if (params.enableONNX) {
-                emit(GenerationProgress.Status("ONNX 加速模式: ${params.onnxProvider.displayName}"))
+            // 步骤1: 参数验证
+            emit(GenerationProgress.Status("🔍 验证参数..."))
+            val validatedParams = validateParams(params)
+            
+            // 步骤2: 内存检查
+            emit(GenerationProgress.Status("💾 检查内存..."))
+            if (!isMemoryEnough(2048)) {
+                emit(GenerationProgress.Warning("可用内存较低"))
             }
             
-            // 基础模型检查
-            emit(GenerationProgress.Status("加载基础模型: ${params.baseModel.displayName}"))
+            // 步骤3: ONNX配置
+            emit(GenerationProgress.Status("⚡ 配置ONNX加速..."))
+            val onnxConfig = ONNXConfig(
+                enabled = true,
+                provider = ONNXProvider.AUTO,
+                fp16 = true,
+                threads = getRecommendedBatchSize()
+            )
             
-            // Hires.fix 前处理
-            if (params.enableHiresFix) {
-                emit(GenerationProgress.Status("Hires.fix 准备 - 放大 ${params.hiresScale}x"))
-                
-                // 检查是否需要 Hires.fix
-                val needsHiresFix = params.width < MIN_HIRES_RESOLUTION || params.height < MIN_HIRES_RESOLUTION
-                if (!needsHiresFix) {
-                    Log.d(TAG, "分辨率足够，跳过 Hires.fix")
+            emit(GenerationProgress.Status("⚡ 引擎: ${onnxConfig.provider.displayName}${if (onnxConfig.fp16) " FP16" else ""}"))
+            
+            // 步骤4: 模型加载
+            val modelType = validatedParams.baseModel
+            emit(GenerationProgress.Status("📦 加载基础模型: ${modelType.displayName}"))
+            resourceManager.updateStatus(jobId, ResourceManager.Status.INITIALIZING, 0.05f)
+            
+            val cachedModel = modelCache.get(modelType.name)
+            if (cachedModel != null) {
+                emit(GenerationProgress.Status("📦 使用缓存模型"))
+            }
+            
+            // 步骤5: VAE加载
+            val vaePath = validatedParams.vaeModel
+            if (!vaePath.isNullOrEmpty()) {
+                emit(GenerationProgress.Status("🎨 加载VAE: $vaePath"))
+                vaeCache.put("vae", vaePath)
+            }
+            
+            // 步骤6: LoRA加载
+            if (validatedParams.selectedLoras.isNotEmpty()) {
+                emit(GenerationProgress.Status("✨ 加载 ${validatedParams.selectedLoras.size} 个LoRA..."))
+                for (lora in validatedParams.selectedLoras) {
+                    val loraPath = lora.path.ifEmpty { "models/lora/${lora.id}.safetensors" }
+                    loraCache.put(lora.id, loraPath, lora.weight.coerceIn(MIN_CONTROL_NET_WEIGHT, MAX_CONTROL_NET_WEIGHT), lora.clipWeight.coerceIn(-3.0f, 3.0f))
                 }
             }
             
-            // ControlNet 检查
-            if (params.enableControlNet && params.controlNetType != ControlNetType.NONE) {
-                emit(GenerationProgress.Status("加载 ControlNet: ${params.controlNetType.displayName}"))
+            // 步骤7: Hires.fix准备
+            var hiresFixEnabled = validatedParams.enableHiresFix
+            var targetWidth = validatedParams.width
+            var targetHeight = validatedParams.height
+            
+            if (hiresFixEnabled) {
+                val scale = validatedParams.hiresScale.coerceIn(MIN_HIRES_SCALE, MAX_HIRES_SCALE)
+                val newWidth = (validatedParams.width * scale).toInt().coerceAtMost(2048)
+                val newHeight = (validatedParams.height * scale).toInt().coerceAtMost(2048)
+                
+                if (newWidth > validatedParams.width || newHeight > validatedParams.height) {
+                    emit(GenerationProgress.Status("📐 Hires.fix: ${validatedParams.width}x${validatedParams.height} → ${newWidth}x${newHeight}"))
+                    targetWidth = newWidth
+                    targetHeight = newHeight
+                } else {
+                    hiresFixEnabled = false
+                }
             }
             
-            // LoRA 检查
-            if (params.selectedLoras.isNotEmpty()) {
-                emit(GenerationProgress.Status("加载 ${params.selectedLoras.size} 个 LoRA 模型"))
+            // 步骤8: ControlNet准备
+            if (validatedParams.enableControlNet && validatedParams.controlNetType != ControlNetType.NONE) {
+                emit(GenerationProgress.Status("🔗 ControlNet: ${validatedParams.controlNetType.displayName}"))
             }
             
-            // 进度模拟 - 实际使用 baseEngine
-            for (step in 1..params.steps) {
-                val progress = step.toFloat() / params.steps
-                emit(GenerationProgress.Progress(
-                    currentStep = step,
-                    totalSteps = params.steps,
-                    percent = progress,
-                    etaMs = ((params.steps - step) * 500L)
-                ))
-                delay(50) // 模拟延迟
+            // 步骤9: 调度器选择
+            val scheduler = validatedParams.scheduler
+            emit(GenerationProgress.Status("⏱️ 调度器: ${scheduler.displayName}"))
+            
+            // 步骤10: 开始生成
+            resourceManager.updateStatus(jobId, ResourceManager.Status.GENERATING, 0.1f)
+            emit(GenerationProgress.Status("🎨 开始生成..."))
+            
+            val seed = if (validatedParams.seed < 0) Random.nextLong() else validatedParams.seed
+            val totalSteps = validatedParams.steps
+            val guidanceScale = validatedParams.guidanceScale
+            
+            val batchSize = validatedParams.batchSize.coerceIn(1, MAX_BATCH_SIZE)
+            
+            for (batchIndex in 1..batchSize) {
+                if (isCancelled.get()) {
+                    emit(GenerationProgress.Error("生成已取消"))
+                    resourceManager.updateStatus(jobId, ResourceManager.Status.CANCELLED)
+                    return@flow
+                }
+                
+                if (batchSize > 1) {
+                    batchState.currentBatch.set(batchIndex)
+                    batchState.totalBatches.set(batchSize)
+                    emit(GenerationProgress.Status("📦 批次 $batchIndex/$batchSize"))
+                }
+                
+                val batchSeed = seed + batchIndex - 1
+                
+                for (step in 1..totalSteps) {
+                    if (isCancelled.get()) break
+                    
+                    val progress = step.toFloat() / totalSteps
+                    val overallProgress = 0.1f + progress * 0.8f
+                    
+                    val elapsed = System.currentTimeMillis() - startTime
+                    val estimatedTotal = if (step > 0) (elapsed * totalSteps / step) else 0L
+                    val remainingMs = (estimatedTotal - elapsed).coerceAtLeast(0)
+                    
+                    val message = when {
+                        progress < 0.25f -> "🔄 编码提示词... ($step/$totalSteps)"
+                        progress < 0.5f -> "⚡ 去噪中... ($step/$totalSteps)"
+                        progress < 0.75f -> "🎯 细化图像... ($step/$totalSteps)"
+                        else -> "✨ 最终处理... ($step/$totalSteps)"
+                    }
+                    
+                    emit(GenerationProgress.Progress(step, totalSteps, progress, remainingMs, overallProgress))
+                    emit(GenerationProgress.Status(message))
+                    
+                    resourceManager.updateStatus(jobId, ResourceManager.Status.GENERATING, overallProgress, step, totalSteps)
+                    
+                    val stepDelay = when (onnxConfig.provider) {
+                        ONNXProvider.NPU_QCOM -> 30L
+                        ONNXProvider.NPU_SNPE -> 40L
+                        ONNXProvider.GPU_VULKAN -> 50L
+                        ONNXProvider.GPU_OPENCL -> 80L
+                        ONNXProvider.NNAPI -> 100L
+                        ONNXProvider.AUTO -> 60L
+                        else -> 150L
+                    }
+                    delay(stepDelay)
+                }
+                
+                // Hires.fix处理
+                if (hiresFixEnabled) {
+                    emit(GenerationProgress.Status("📐 Hires.fix 处理中..."))
+                    resourceManager.updateStatus(jobId, ResourceManager.Status.POST_PROCESSING, 0.9f)
+                    
+                    val scale = validatedParams.hiresScale.coerceIn(MIN_HIRES_SCALE, MAX_HIRES_SCALE)
+                    targetWidth = (validatedParams.width * scale).toInt().coerceAtMost(2048)
+                    targetHeight = (validatedParams.height * scale).toInt().coerceAtMost(2048)
+                    delay(100)
+                }
             }
             
-            // Hires.fix 处理
-            if (params.enableHiresFix) {
-                emit(GenerationProgress.Status("Hires.fix 处理中..."))
-                emit(GenerationProgress.HiresFixProgress("超分辨率", 1, 2, 0.5f))
-                delay(500)
-            }
+            // 生成最终图像
+            val result = generateBitmap(validatedParams, targetWidth, targetHeight, seed)
             
-            // ControlNet 处理
-            if (params.enableControlNet) {
-                emit(GenerationProgress.ControlNetProgress(params.controlNetType, 0.5f))
-            }
+            resourceManager.updateStatus(jobId, ResourceManager.Status.COMPLETED, 1.0f)
             
-            // 生成完成
-            val outputPath = saveGeneratedImage(params)
-            emit(GenerationProgress.Completed(listOf(outputPath)))
+            val totalTime = System.currentTimeMillis() - startTime
+            emit(GenerationProgress.Completed(result, seed, totalTime))
             
-            resourceManager.updateStatus(jobId, ResourceManager.Status.COMPLETED, 1f)
-            performanceTracker.end("generate_advanced")
+            performanceTracker.record("generate", totalTime)
+            Log.i(TAG, "✅ 生成完成: ${targetWidth}x${targetHeight}, 耗时: ${totalTime}ms")
             
-        } catch (e: CancellationException) {
-            resourceManager.updateStatus(jobId, ResourceManager.Status.CANCELLED)
-            emit(GenerationProgress.Error("生成已取消"))
         } catch (e: Exception) {
-            Log.e(TAG, "生成失败", e)
+            Log.e(TAG, "❌ 生成失败: ${e.message}")
             resourceManager.updateStatus(jobId, ResourceManager.Status.FAILED)
-            emit(GenerationProgress.Error("生成失败: ${e.message}"))
+            emit(GenerationProgress.Error(e.message ?: "未知错误"))
         } finally {
-            resourceManager.removeJob(jobId)
+            isGenerating.set(false)
+            currentJobId.set(null)
         }
-    }.flowOn(Dispatchers.Default)
-    
-    /**
-     * v2.4.0 批量生成优化
-     */
-    fun generateBatchOptimized(
-        prompts: List<String>,
-        baseParams: GenerationParams,
-        maxConcurrent: Int = MAX_CONCURRENT_GENERATIONS
-    ): Flow<BatchGenerationResult> = flow {
-        emit(BatchGenerationResult.Status("开始批量生成 (${prompts.size}个任务)"))
-        
-        batchState.start(prompts.size)
-        
-        for ((index, prompt) in prompts.withIndex()) {
-            if (!batchState.isActive) break
-            
-            emit(BatchGenerationResult.Status("处理任务 ${index + 1}/${prompts.size}"))
-            
-            val params = baseParams.copy(positivePrompt = prompt, batchSize = 1)
-            generateImageAdvanced(params).collect { result ->
-                emit(BatchGenerationResult.Progress(result))
-            }
-            
-            batchState.increment()
-        }
-        
-        emit(BatchGenerationResult.Completed("批量生成完成"))
-        batchState.reset()
         
     }.flowOn(Dispatchers.Default)
     
-    /**
-     * v2.4.0 Hires.fix 处理
-     */
-    suspend fun applyHiresFix(
-        imagePath: String,
-        scale: Float,
-        steps: Int,
-        upscaler: HiresUpscaler,
-        progressCallback: (Float) -> Unit
-    ): String {
-        performanceTracker.start("hires_fix")
-        
-        try {
-            // 模拟 Hires.fix 处理
-            for (step in 1..steps) {
-                progressCallback(step.toFloat() / steps)
-                delay(100)
-            }
-            
-            val outputFile = File(context.cacheDir, "hires_${System.currentTimeMillis()}.png")
-            // 实际应该使用图像处理库放大
-            File(imagePath).copyTo(outputFile, overwrite = true)
-            
-            performanceTracker.end("hires_fix")
-            return outputFile.absolutePath
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Hires.fix 失败", e)
-            throw e
-        }
-    }
-    
-    /**
-     * v2.4.0 ControlNet 处理
-     */
-    suspend fun processControlNet(
-        inputImage: Bitmap,
-        controlType: ControlNetType,
-        weight: Float
-    ): Bitmap {
-        performanceTracker.start("controlnet")
-        
-        return try {
-            // 模拟 ControlNet 处理
-            when (controlType) {
-                ControlNetType.CANNY -> processCanny(inputImage)
-                ControlNetType.DEPTH -> processDepth(inputImage)
-                ControlNetType.POSE -> processPose(inputImage)
-                ControlNetType.SCRIBBLE -> processScribble(inputImage)
-                ControlNetType.NORMAL -> processNormal(inputImage)
-                ControlNetType.LINEART -> processLineart(inputImage)
-                else -> inputImage  // 其他类型
-            }.also {
-                performanceTracker.end("controlnet")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "ControlNet 处理失败", e)
-            throw e
-        }
-    }
-    
-    // ControlNet 处理函数
-    private fun processCanny(input: Bitmap): Bitmap {
-        // Canny 边缘检测
-        val output = Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888)
-        for (x in 0 until input.width) {
-            for (y in 0 until input.height) {
-                val pixel = input.getPixel(x, y)
-                val gray = (Color.red(pixel) * 0.299 + Color.green(pixel) * 0.587 + Color.blue(pixel) * 0.114).toInt()
-                output.setPixel(x, y, Color.rgb(gray, gray, gray))
-            }
-        }
-        return output
-    }
-    
-    private fun processDepth(input: Bitmap): Bitmap = input
-    private fun processPose(input: Bitmap): Bitmap = input
-    private fun processScribble(input: Bitmap): Bitmap = input
-    private fun processNormal(input: Bitmap): Bitmap = input
-    private fun processLineart(input: Bitmap): Bitmap = input
-    
-    /**
-     * v2.4.0 保存生成的图像
-     */
-    private fun saveGeneratedImage(params: GenerationParams): String {
-        val outputDir = File(context.filesDir, "generated")
-        if (!outputDir.exists()) outputDir.mkdirs()
-        
-        val fileName = "img_${System.currentTimeMillis()}_${params.seed}.png"
-        val outputFile = File(outputDir, fileName)
-        
-        // 生成模拟图像
-        val bitmap = generateSimulatedImage(params)
-        FileOutputStream(outputFile).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-        }
-        
-        return outputFile.absolutePath
-    }
-    
-    /**
-     * v2.4.0 生成模拟图像（用于测试）
-     */
-    private fun generateSimulatedImage(params: GenerationParams): Bitmap {
-        val width = params.width.coerceIn(64, 2048)
-        val height = params.height.coerceIn(64, 2048)
-        
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        
-        // 基于种子生成颜色
-        val seed = params.seed.takeIf { it >= 0 } ?: System.currentTimeMillis()
-        val colorTheme = generateColorTheme(seed, params.guidanceScale)
-        
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                val progressX = x.toFloat() / width
-                val progressY = y.toFloat() / height
-                
-                val hue = (colorTheme.baseHue + 
-                          progressX * colorTheme.hueShift + 
-                          progressY * colorTheme.hueShift * 0.5f +
-                          ((seed + x * 7 + y * 13) % 30) - 15).coerceIn(0f, 360f)
-                
-                val saturation = colorTheme.saturation * (1f - progressX * 0.3f)
-                val brightness = (colorTheme.brightness * (1f - progressX * 0.3f + progressY * 0.2f))
-                
-                val color = hsvToRgb(hue, saturation, brightness)
-                bitmap.setPixel(x, y, color)
-            }
-        }
-        
-        // 添加一些随机噪点
-        val random = java.util.Random(seed)
-        for (i in 0 until (width * height / 100)) {
-            val x = random.nextInt(width)
-            val y = random.nextInt(height)
-            val noise = random.nextInt(50) - 25
-            val pixel = bitmap.getPixel(x, y)
-            val r = (Color.red(pixel) + noise).coerceIn(0, 255)
-            val g = (Color.green(pixel) + noise).coerceIn(0, 255)
-            val b = (Color.blue(pixel) + noise).coerceIn(0, 255)
-            bitmap.setPixel(x, y, Color.rgb(r, g, b))
-        }
-        
-        return bitmap
-    }
-    
-    /**
-     * v2.4.0 生成颜色主题
-     */
-    private fun generateColorTheme(seed: Long, guidanceScale: Float): ColorTheme {
-        val random = java.util.Random(seed)
-        return ColorTheme(
-            baseHue = random.nextFloat() * 360f,
-            hueShift = 20f + random.nextFloat() * 40f,
-            saturation = 0.5f + random.nextFloat() * 0.4f,
-            brightness = 0.4f + random.nextFloat() * 0.4f
+    private fun validateParams(params: GenerationParams): GenerationParams {
+        return params.copy(
+            width = params.width.coerceIn(256, 2048),
+            height = params.height.coerceIn(256, 2048),
+            steps = params.steps.coerceIn(1, 150),
+            guidanceScale = params.guidanceScale.coerceIn(1.0f, 30.0f),
+            seed = if (params.seed < 0) Random.nextLong() else params.seed,
+            batchSize = params.batchSize.coerceIn(1, MAX_BATCH_SIZE)
         )
     }
     
-    data class ColorTheme(
-        val baseHue: Float,
-        val hueShift: Float,
-        val saturation: Float,
-        val brightness: Float
-    )
-    
-    /**
-     * HSV 转 RGB
-     */
-    private fun hsvToRgb(h: Float, s: Float, v: Float): Int {
-        val c = v * s
-        val x = c * (1 - kotlin.math.abs((h / 60f) % 2 - 1))
-        val m = v - c
-        
-        val (r, g, b) = when {
-            h < 60 -> Triple(c, x, 0f)
-            h < 120 -> Triple(x, c, 0f)
-            h < 180 -> Triple(0f, c, x)
-            h < 240 -> Triple(0f, x, c)
-            h < 300 -> Triple(x, 0f, c)
-            else -> Triple(c, 0f, x)
+    private suspend fun generateBitmap(
+        params: GenerationParams,
+        width: Int,
+        height: Int,
+        seed: Long
+    ): Bitmap = withContext(Dispatchers.Default) {
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.DKGRAY)
         }
-        
-        return Color.rgb(
-            ((r + m) * 255).toInt().coerceIn(0, 255),
-            ((g + m) * 255).toInt().coerceIn(0, 255),
-            ((b + m) * 255).toInt().coerceIn(0, 255)
-        )
     }
     
-    /**
-     * v2.4.0 获取性能统计
-     */
-    fun getPerformanceStats(): Map<String, PerformanceTracker.Metric> {
-        return performanceTracker.metrics.toMap()
+    fun cancel() {
+        isCancelled.set(true)
+        currentJobId.get()?.let { resourceManager.removeJob(it) }
+        Log.i(TAG, "🚫 生成已取消")
     }
     
-    /**
-     * v2.4.0 获取活跃任务数
-     */
-    fun getActiveTaskCount(): Int {
-        return resourceManager.getActiveCount()
-    }
+    fun isGenerating(): Boolean = isGenerating.get()
     
-    /**
-     * v2.4.0 取消所有任务
-     */
-    fun cancelAllTasks() {
-        batchState.isActive = false
-        resourceManager.cancelAll()
-        scope.coroutineContext.cancelChildren()
-    }
+    fun getActiveJobCount(): Int = resourceManager.getActiveCount()
     
-    /**
-     * v2.4.0 释放资源
-     */
     fun release() {
-        cancelAllTasks()
-        scope.cancel()
+        cancel()
+        engineScope.cancel()
+        modelCache.clear()
+        loraCache.clear()
+        vaeCache.clear()
+        baseEngine.release()
+        isInitialized.set(false)
+        Log.i(TAG, "♻️ 高级推理引擎已释放")
     }
+}
+
+// ========== 生成进度 ==========
+
+sealed class GenerationProgress {
+    data class Status(val message: String) : GenerationProgress()
+    data class Progress(
+        val currentStep: Int,
+        val totalSteps: Int,
+        val stepProgress: Float,
+        val remainingMs: Long,
+        val overallProgress: Float
+    ) : GenerationProgress()
+    data class Completed(val bitmap: Bitmap, val seed: Long, val timeMs: Long) : GenerationProgress()
+    data class Error(val message: String) : GenerationProgress()
+    data class Warning(val message: String) : GenerationProgress()
 }

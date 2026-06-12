@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import comkuaihuiai.data.model.*
+import comkuaihuiai.service.SafetyResult
 import comkuaihuiai.service.SafeModeManager
 import comkuaihuiai.service.native.NativeInferenceEngine
 import kotlinx.coroutines.*
@@ -91,9 +92,12 @@ class GenerationRepository(private val context: Context) {
         
         // 安全检查
         val safetyResult = performSafetyCheck(params)
-        if (safetyResult is SafeModeManager.SafetyResult.UNSAFE) {
-            emit(GenerationProgress.Error("⚠️ 内容安全检查未通过: ${safetyResult.reason}"))
-            return@flow
+        when (safetyResult) {
+            is SafetyResult.Unsafe -> {
+                emit(GenerationProgress.Error("⚠️ 内容安全检查未通过: ${safetyResult.reason}"))
+                return@flow
+            }
+            else -> { /* 继续执行 */ }
         }
         
         emit(GenerationProgress.Status("🔧 初始化推理引擎..."))
@@ -218,8 +222,8 @@ class GenerationRepository(private val context: Context) {
     /**
      * 安全检查
      */
-    private fun performSafetyCheck(params: GenerationParams): SafeModeManager.SafetyResult {
-        return SafeModeManager.SafetyResult.SAFE
+    private fun performSafetyCheck(params: GenerationParams): SafetyResult {
+        return SafetyResult.SAFE
     }
     
     // 历史记录管理
