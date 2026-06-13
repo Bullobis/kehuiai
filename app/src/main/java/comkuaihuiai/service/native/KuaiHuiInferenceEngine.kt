@@ -11,8 +11,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * LocalDream 完整推理引擎
- * 整合 LocalDream 2.6.0 的所有功能
+ * KehuiAI 完整推理引擎
+ * 整合 KehuiAI 2.6.0 的所有功能
  * 
  * 支持：
  * - 文生图 (txt2img)
@@ -24,33 +24,33 @@ import java.io.File
  * - 提示词缓存
  * - 多种调度器
  */
-class LocalDreamInferenceEngine(private val context: Context) {
+class KehuiAIInferenceEngine(private val context: Context) {
 
     companion object {
-        private const val TAG = "LocalDreamEngine"
+        private const val TAG = "KehuiAIEngine"
         
         // 默认模型目录
         const val DEFAULT_MODEL_DIR = "models/mnn"
         
         @Volatile
-        private var instance: LocalDreamInferenceEngine? = null
+        private var instance: KehuiAIInferenceEngine? = null
         
-        fun getInstance(context: Context): LocalDreamInferenceEngine {
+        fun getInstance(context: Context): KehuiAIInferenceEngine {
             return instance ?: synchronized(this) {
-                instance ?: LocalDreamInferenceEngine(context.applicationContext).also { instance = it }
+                instance ?: KehuiAIInferenceEngine(context.applicationContext).also { instance = it }
             }
         }
     }
     
     // 底层 native 引擎
-    private val nativeEngine = NativeLocalDreamEngine.getInstance(context)
+    private val nativeEngine = NativeKehuiAIEngine.getInstance(context)
     
     // 模型管理器
-    private val modelManager = LocalDreamModelManager.getInstance(context)
+    private val modelManager = KehuiAIModelManager.getInstance(context)
     
     // 状态
     private var isInitialized = false
-    private var currentEngineType = NativeLocalDreamEngine.ENGINE_MNN
+    private var currentEngineType = NativeKehuiAIEngine.ENGINE_MNN
     
     // LoRA 加载状态
     private val loadedLoras = mutableMapOf<String, Float>()
@@ -69,11 +69,11 @@ class LocalDreamInferenceEngine(private val context: Context) {
     /**
      * 初始化引擎
      */
-    suspend fun initialize(engineType: Int = NativeLocalDreamEngine.ENGINE_MNN): Boolean {
+    suspend fun initialize(engineType: Int = NativeKehuiAIEngine.ENGINE_MNN): Boolean {
         if (isInitialized) return true
         
         try {
-            Log.i(TAG, "Initializing LocalDream engine...")
+            Log.i(TAG, "Initializing KehuiAI engine...")
             
             // 初始化模型
             val modelInitResult = modelManager.initialize()
@@ -96,7 +96,7 @@ class LocalDreamInferenceEngine(private val context: Context) {
             currentEngineType = engineType
             isInitialized = true
             
-            Log.i(TAG, "LocalDream engine initialized successfully")
+            Log.i(TAG, "KehuiAI engine initialized successfully")
             return true
             
         } catch (e: Exception) {
@@ -135,18 +135,18 @@ class LocalDreamInferenceEngine(private val context: Context) {
         seed: Int = -1,
         sampler: Int = currentSampler,
         enablePromptCache: Boolean = true
-    ): Flow<LocalDreamProgress> = flow {
-        emit(LocalDreamProgress.Status("Starting txt2img..."))
+    ): Flow<KehuiAIProgress> = flow {
+        emit(KehuiAIProgress.Status("Starting txt2img..."))
         
         if (!isInitialized) {
             val initResult = initialize(currentEngineType)
             if (!initResult) {
-                emit(LocalDreamProgress.Error("Failed to initialize"))
+                emit(KehuiAIProgress.Error("Failed to initialize"))
                 return@flow
             }
         }
         
-        emit(LocalDreamProgress.Progress(0, "Generating..."))
+        emit(KehuiAIProgress.Progress(0, "Generating..."))
         
         try {
             nativeEngine.generate(
@@ -163,22 +163,22 @@ class LocalDreamInferenceEngine(private val context: Context) {
             ).collect { progress ->
                 when (progress) {
                     is LDGenerationProgress.Status -> {
-                        emit(LocalDreamProgress.Status(progress.message))
+                        emit(KehuiAIProgress.Status(progress.message))
                     }
                     is LDGenerationProgress.Progress -> {
-                        emit(LocalDreamProgress.Progress(progress.percent, progress.message))
+                        emit(KehuiAIProgress.Progress(progress.percent, progress.message))
                     }
                     is LDGenerationProgress.Completed -> {
-                        emit(LocalDreamProgress.Completed(progress.image))
+                        emit(KehuiAIProgress.Completed(progress.image))
                     }
                     is LDGenerationProgress.Error -> {
-                        emit(LocalDreamProgress.Error(progress.message))
+                        emit(KehuiAIProgress.Error(progress.message))
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "txt2img error: ${e.message}", e)
-            emit(LocalDreamProgress.Error(e.message ?: "Unknown error"))
+            emit(KehuiAIProgress.Error(e.message ?: "Unknown error"))
         }
     }
     
@@ -196,15 +196,15 @@ class LocalDreamInferenceEngine(private val context: Context) {
         seed: Int = -1,
         sampler: Int = currentSampler,
         strength: Float = 0.8f
-    ): Flow<LocalDreamProgress> = flow {
-        emit(LocalDreamProgress.Status("Starting img2img..."))
+    ): Flow<KehuiAIProgress> = flow {
+        emit(KehuiAIProgress.Status("Starting img2img..."))
         
         if (!isInitialized) {
-            emit(LocalDreamProgress.Error("Engine not initialized"))
+            emit(KehuiAIProgress.Error("Engine not initialized"))
             return@flow
         }
         
-        emit(LocalDreamProgress.Progress(0, "Processing..."))
+        emit(KehuiAIProgress.Progress(0, "Processing..."))
         
         try {
             nativeEngine.generateImg2Img(
@@ -221,21 +221,21 @@ class LocalDreamInferenceEngine(private val context: Context) {
             ).collect { progress ->
                 when (progress) {
                     is LDGenerationProgress.Status -> {
-                        emit(LocalDreamProgress.Status(progress.message))
+                        emit(KehuiAIProgress.Status(progress.message))
                     }
                     is LDGenerationProgress.Progress -> {
-                        emit(LocalDreamProgress.Progress(progress.percent, progress.message))
+                        emit(KehuiAIProgress.Progress(progress.percent, progress.message))
                     }
                     is LDGenerationProgress.Completed -> {
-                        emit(LocalDreamProgress.Completed(progress.image))
+                        emit(KehuiAIProgress.Completed(progress.image))
                     }
                     is LDGenerationProgress.Error -> {
-                        emit(LocalDreamProgress.Error(progress.message))
+                        emit(KehuiAIProgress.Error(progress.message))
                     }
                 }
             }
         } catch (e: Exception) {
-            emit(LocalDreamProgress.Error(e.message ?: "Error"))
+            emit(KehuiAIProgress.Error(e.message ?: "Error"))
         }
     }
     
@@ -254,11 +254,11 @@ class LocalDreamInferenceEngine(private val context: Context) {
         seed: Int = -1,
         sampler: Int = currentSampler,
         strength: Float = 0.8f
-    ): Flow<LocalDreamProgress> = flow {
-        emit(LocalDreamProgress.Status("Starting inpainting..."))
+    ): Flow<KehuiAIProgress> = flow {
+        emit(KehuiAIProgress.Status("Starting inpainting..."))
         
         if (!isInitialized) {
-            emit(LocalDreamProgress.Error("Engine not initialized"))
+            emit(KehuiAIProgress.Error("Engine not initialized"))
             return@flow
         }
         
@@ -277,14 +277,14 @@ class LocalDreamInferenceEngine(private val context: Context) {
                 strength = strength
             ).collect { progress ->
                 when (progress) {
-                    is LDGenerationProgress.Status -> emit(LocalDreamProgress.Status(progress.message))
-                    is LDGenerationProgress.Progress -> emit(LocalDreamProgress.Progress(progress.percent, progress.message))
-                    is LDGenerationProgress.Completed -> emit(LocalDreamProgress.Completed(progress.image))
-                    is LDGenerationProgress.Error -> emit(LocalDreamProgress.Error(progress.message))
+                    is LDGenerationProgress.Status -> emit(KehuiAIProgress.Status(progress.message))
+                    is LDGenerationProgress.Progress -> emit(KehuiAIProgress.Progress(progress.percent, progress.message))
+                    is LDGenerationProgress.Completed -> emit(KehuiAIProgress.Completed(progress.image))
+                    is LDGenerationProgress.Error -> emit(KehuiAIProgress.Error(progress.message))
                 }
             }
         } catch (e: Exception) {
-            emit(LocalDreamProgress.Error(e.message ?: "Error"))
+            emit(KehuiAIProgress.Error(e.message ?: "Error"))
         }
     }
     
@@ -295,25 +295,25 @@ class LocalDreamInferenceEngine(private val context: Context) {
         inputImage: Bitmap,
         scale: Int = 2,
         method: Int = 0
-    ): Flow<LocalDreamProgress> = flow {
-        emit(LocalDreamProgress.Status("Starting upscale..."))
+    ): Flow<KehuiAIProgress> = flow {
+        emit(KehuiAIProgress.Status("Starting upscale..."))
         
         if (!isInitialized) {
-            emit(LocalDreamProgress.Error("Engine not initialized"))
+            emit(KehuiAIProgress.Error("Engine not initialized"))
             return@flow
         }
         
         try {
             nativeEngine.upscale(inputImage, scale, method).collect { progress ->
                 when (progress) {
-                    is LDGenerationProgress.Status -> emit(LocalDreamProgress.Status(progress.message))
-                    is LDGenerationProgress.Progress -> emit(LocalDreamProgress.Progress(progress.percent, progress.message))
-                    is LDGenerationProgress.Completed -> emit(LocalDreamProgress.Completed(progress.image))
-                    is LDGenerationProgress.Error -> emit(LocalDreamProgress.Error(progress.message))
+                    is LDGenerationProgress.Status -> emit(KehuiAIProgress.Status(progress.message))
+                    is LDGenerationProgress.Progress -> emit(KehuiAIProgress.Progress(progress.percent, progress.message))
+                    is LDGenerationProgress.Completed -> emit(KehuiAIProgress.Completed(progress.image))
+                    is LDGenerationProgress.Error -> emit(KehuiAIProgress.Error(progress.message))
                 }
             }
         } catch (e: Exception) {
-            emit(LocalDreamProgress.Error(e.message ?: "Error"))
+            emit(KehuiAIProgress.Error(e.message ?: "Error"))
         }
     }
     
@@ -506,7 +506,7 @@ class LocalDreamInferenceEngine(private val context: Context) {
      */
     fun getStatusReport(): String {
         return buildString {
-            appendLine("=== LocalDream Engine Status ===")
+            appendLine("=== KehuiAI Engine Status ===")
             appendLine("Initialized: $isInitialized")
             appendLine("Engine Type: $currentEngineType")
             appendLine("Current Sampler: ${getSchedulerNames().getOrElse(currentSampler) { "unknown" }}")
@@ -528,9 +528,9 @@ class LocalDreamInferenceEngine(private val context: Context) {
 }
 
 // 进度回调 sealed class
-sealed class LocalDreamProgress {
-    data class Status(val message: String) : LocalDreamProgress()
-    data class Progress(val percent: Int, val message: String) : LocalDreamProgress()
-    data class Completed(val image: Bitmap) : LocalDreamProgress()
-    data class Error(val message: String) : LocalDreamProgress()
+sealed class KehuiAIProgress {
+    data class Status(val message: String) : KehuiAIProgress()
+    data class Progress(val percent: Int, val message: String) : KehuiAIProgress()
+    data class Completed(val image: Bitmap) : KehuiAIProgress()
+    data class Error(val message: String) : KehuiAIProgress()
 }

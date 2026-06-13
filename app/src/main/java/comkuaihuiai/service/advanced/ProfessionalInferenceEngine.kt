@@ -19,7 +19,7 @@ import kotlin.random.Random
 
 /**
  * 快绘AI v3.2.0 专业推理引擎
- * 全面对标 Local Dream / Draw Things / ComfyUI
+ * 全面对标 可绘AI / Draw Things / ComfyUI
  *
  * 核心功能:
  * ✅ 实时预览 (Real-time Preview)
@@ -104,7 +104,7 @@ class ProfessionalInferenceEngine(private val context: Context) {
         AUTO("自动", 5.0f, "自动选择最佳引擎")
     }
 
-    // ========== 调度器类型 (完整版 - 对标 Local Dream) ==========
+    // ========== 调度器类型 (完整版 - 对标 可绘AI) ==========
 
     enum class SchedType(
         val displayName: String,

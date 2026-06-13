@@ -29,7 +29,7 @@ import kotlin.random.Random
 /**
  * 快绘AI v3.0.0 真正的本地推理引擎
  * 
- * 对标 Local Dream / Draw Things / ComfyUI
+ * 对标 可绘AI / Draw Things / ComfyUI
  * 
  * 支持：文生图、图生图、局部重绘、超分
  * 硬件加速：CPU、GPU(OpenCL)、NPU(骁龙)

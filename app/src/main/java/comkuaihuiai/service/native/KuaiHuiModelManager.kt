@@ -10,13 +10,13 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * LocalDream MNN 模型管理器
- * 整合 LocalDream 2.6.0 的预编译 MNN 模型
+ * KehuiAI MNN 模型管理器
+ * 整合 KehuiAI 2.6.0 的预编译 MNN 模型
  */
-class LocalDreamModelManager(private val context: Context) {
+class KehuiAIModelManager(private val context: Context) {
 
     companion object {
-        private const val TAG = "LocalDreamModel"
+        private const val TAG = "KehuiAIModel"
         
         // 模型路径（assets 目录）
         const val MODEL_DIR = "models/mnn"
@@ -30,11 +30,11 @@ class LocalDreamModelManager(private val context: Context) {
         const val TOKENIZER_JSON = "tokenizer.json"
         
         @Volatile
-        private var instance: LocalDreamModelManager? = null
+        private var instance: KehuiAIModelManager? = null
         
-        fun getInstance(context: Context): LocalDreamModelManager {
+        fun getInstance(context: Context): KehuiAIModelManager {
             return instance ?: synchronized(this) {
-                instance ?: LocalDreamModelManager(context.applicationContext).also { instance = it }
+                instance ?: KehuiAIModelManager(context.applicationContext).also { instance = it }
             }
         }
     }
@@ -56,7 +56,7 @@ class LocalDreamModelManager(private val context: Context) {
      */
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
-            Log.i(TAG, "Initializing LocalDream models...")
+            Log.i(TAG, "Initializing KehuiAI models...")
             
             val modelDir = File(context.filesDir, MODEL_DIR)
             if (!modelDir.exists()) {

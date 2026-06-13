@@ -9,15 +9,15 @@ import kotlinx.coroutines.flow.flow
 import java.io.ByteArrayOutputStream
 
 /**
- * LocalDream 原生引擎 JNI 包装器
- * 整合 LocalDream 2.6.0 的完整 C++ 推理功能
+ * KehuiAI 原生引擎 JNI 包装器
+ * 整合 KehuiAI 2.6.0 的完整 C++ 推理功能
  */
-class NativeLocalDreamEngine private constructor(
+class NativeKehuiAIEngine private constructor(
     private val _context: Context
 ) {
     
     companion object {
-        private const val TAG = "NativeLocalDreamEngine"
+        private const val TAG = "NativeKehuiAIEngine"
         
         // 引擎类型
         const val ENGINE_CPU = 0
@@ -72,11 +72,11 @@ class NativeLocalDreamEngine private constructor(
         const val CN_BLUR = 8
         
         @Volatile
-        private var instance: NativeLocalDreamEngine? = null
+        private var instance: NativeKehuiAIEngine? = null
         
-        fun getInstance(context: Context): NativeLocalDreamEngine {
+        fun getInstance(context: Context): NativeKehuiAIEngine {
             return instance ?: synchronized(this) {
-                instance ?: NativeLocalDreamEngine(context.applicationContext).also { instance = it }
+                instance ?: NativeKehuiAIEngine(context.applicationContext).also { instance = it }
             }
         }
     }

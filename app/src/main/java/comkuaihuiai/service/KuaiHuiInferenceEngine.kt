@@ -22,7 +22,7 @@ import kotlin.random.Random
 /**
  * 快绘AI v3.0.0 推理引擎 - 全面增强版
  * 
- * 对标 Local Dream / Draw Things / ComfyUI
+ * 对标 可绘AI / Draw Things / ComfyUI
  * 
  * 加强内容：
  * ✅ 参数校验系统（ValidationResult）

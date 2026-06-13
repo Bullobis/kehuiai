@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 
 /**
- * 快绘AI v3.1.0 高级推理引擎 - 全面对标 Local Dream / Draw Things
+ * 快绘AI v3.1.0 高级推理引擎 - 全面对标 可绘AI
  */
 class AdvancedInferenceEngine(private val context: Context) {
     
