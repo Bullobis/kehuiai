@@ -5,24 +5,14 @@ import android.graphics.*
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * 可绘AI v3.5.0 - 面部修复专家
- * 
- * 👤 功能：
- * ✅ GFPGAN 人脸修复
- * ✅ 眼部细节增强
- * ✅ 皮肤平滑
- * ✅ 一键美颜
  */
 class FaceEnhancer(private val context: Context) {
 
     companion object {
         private const val TAG = "FaceEnhancer"
-        const val DEFAULT_SMOOTHING = 0.3f
-        const val DEFAULT_DETAIL = 0.5f
     }
     
     enum class EnhancementType(val displayName: String) {
@@ -33,252 +23,104 @@ class FaceEnhancer(private val context: Context) {
         AUTO_BEAUTIFY("一键美颜")
     }
     
-    data class FaceDetection(
-        val bounds: RectF,
-        val confidence: Float = 1f
-    )
+    data class FaceDetection(val bounds: RectF, val confidence: Float = 1f)
     
     data class EnhancementResult(
         val success: Boolean,
         val outputBitmap: Bitmap?,
         val detectedFaces: Int,
-        val processingTimeMs: Long,
-        val error: String? = null
-    )
-    
-    data class EnhancementConfig(
-        val type: EnhancementType,
-        val intensity: Float = 0.5f,
-        val smoothing: Float = DEFAULT_SMOOTHING
+        val processingTimeMs: Long
     )
     
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     
-    private val _progressFlow = MutableSharedFlow<Float>()
-    val progressFlow: SharedFlow<Float> = _progressFlow.asSharedFlow()
-    
-    /**
-     * 检测人脸
-     */
     suspend fun detectFaces(bitmap: Bitmap): List<FaceDetection> = withContext(Dispatchers.Default) {
-        _progressFlow.emit(0.1f)
-        delay(100)
-        
-        // 简化实现：返回中心区域作为检测结果
-        listOf(
-            FaceDetection(
-                bounds = RectF(
-                    bitmap.width * 0.25f,
-                    bitmap.height * 0.2f,
-                    bitmap.width * 0.75f,
-                    bitmap.height * 0.8f
-                ),
-                confidence = 0.95f
-            )
-        )
+        listOf(FaceDetection(RectF(bitmap.width * 0.25f, bitmap.height * 0.2f, 
+            bitmap.width * 0.75f, bitmap.height * 0.8f), 0.95f))
     }
     
-    /**
-     * 增强人脸
-     */
-    suspend fun enhance(
-        bitmap: Bitmap,
-        config: EnhancementConfig
-    ): EnhancementResult = withContext(Dispatchers.Default) {
-        val startTime = System.currentTimeMillis()
-        
-        Log.i(TAG, "🔧 面部增强: ${config.type.displayName}, 强度: ${config.intensity}")
-        
-        try {
-            _progressFlow.emit(0.2f)
-            val faces = detectFaces(bitmap)
-            
-            if (faces.isEmpty()) {
-                return@withContext EnhancementResult(
-                    success = false,
-                    outputBitmap = null,
-                    detectedFaces = 0,
-                    processingTimeMs = 0,
-                    error = "未检测到人脸"
-                )
+    suspend fun enhance(bitmap: Bitmap, type: EnhancementType, intensity: Float = 0.5f): EnhancementResult = 
+        withContext(Dispatchers.Default) {
+            val start = System.currentTimeMillis()
+            Log.i(TAG, "增强: ${type.displayName}")
+            try {
+                val faces = detectFaces(bitmap)
+                if (faces.isEmpty()) return@withContext EnhancementResult(false, null, 0, 0)
+                val output = when (type) {
+                    EnhancementType.FACE_REPAIR -> faceRepair(bitmap, faces, intensity)
+                    EnhancementType.EYE_ENHANCE -> eyeEnhance(bitmap, faces, intensity)
+                    EnhancementType.SKIN_SMOOTH -> skinSmooth(bitmap, faces, intensity)
+                    EnhancementType.BRIGHTEN -> brighten(bitmap, faces, intensity)
+                    EnhancementType.AUTO_BEAUTIFY -> autoBeautify(bitmap, faces, intensity)
+                }
+                EnhancementResult(true, output, faces.size, System.currentTimeMillis() - start)
+            } catch (e: Exception) {
+                EnhancementResult(false, null, 0, 0)
             }
-            
-            _progressFlow.emit(0.5f)
-            
-            val output = when (config.type) {
-                EnhancementType.FACE_REPAIR -> applyFaceRepair(bitmap, faces, config)
-                EnhancementType.EYE_ENHANCE -> applyEyeEnhancement(bitmap, faces, config)
-                EnhancementType.SKIN_SMOOTH -> applySkinSmoothing(bitmap, faces, config)
-                EnhancementType.BRIGHTEN -> applyFaceBrightening(bitmap, faces, config)
-                EnhancementType.AUTO_BEAUTIFY -> applyAutoBeautify(bitmap, faces, config)
-            }
-            
-            _progressFlow.emit(1.0f)
-            
-            EnhancementResult(
-                success = true,
-                outputBitmap = output,
-                detectedFaces = faces.size,
-                processingTimeMs = System.currentTimeMillis() - startTime
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "增强失败: ${e.message}")
-            EnhancementResult(
-                success = false,
-                outputBitmap = null,
-                detectedFaces = 0,
-                processingTimeMs = 0,
-                error = e.message
-            )
         }
+    
+    fun autoBeautify(bitmap: Bitmap, intensity: Float = 0.5f): EnhancementResult {
+        var result: EnhancementResult? = null
+        scope.launch { result = enhance(bitmap, EnhancementType.AUTO_BEAUTIFY, intensity) }
+        return result ?: EnhancementResult(false, null, 0, 0)
     }
     
-    /**
-     * 一键美颜
-     */
-    suspend fun autoBeautify(
-        bitmap: Bitmap,
-        intensity: Float = 0.5f
-    ): EnhancementResult {
-        return enhance(bitmap, EnhancementConfig(EnhancementType.AUTO_BEAUTIFY, intensity))
-    }
+    fun release() = scope.cancel()
     
-    /**
-     * 释放资源
-     */
-    fun release() {
-        scope.cancel()
-    }
-    
-    // ==================== 私有方法 ====================
-    
-    private fun applyFaceRepair(
-        bitmap: Bitmap,
-        faces: List<FaceDetection>,
-        config: EnhancementConfig
-    ): Bitmap {
-        val output = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(output)
-        
+    private fun faceRepair(bmp: Bitmap, faces: List<FaceDetection>, intensity: Float): Bitmap {
+        val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(out)
         faces.forEach { face ->
-            // 模拟超分辨率处理
             val paint = Paint().apply {
                 isAntiAlias = true
-                maskFilter = BlurMaskFilter(8f * config.intensity, BlurMaskFilter.Blur.NORMAL)
+                maskFilter = BlurMaskFilter(8f * intensity, BlurMaskFilter.Blur.NORMAL)
             }
             canvas.drawOval(face.bounds, paint)
         }
-        
-        return output
+        return out
     }
     
-    private fun applyEyeEnhancement(
-        bitmap: Bitmap,
-        faces: List<FaceDetection>,
-        config: EnhancementConfig
-    ): Bitmap {
-        val output = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(output)
-        
+    private fun eyeEnhance(bmp: Bitmap, faces: List<FaceDetection>, intensity: Float): Bitmap {
+        val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(out)
         faces.forEach { face ->
-            // 在眼睛区域添加高光
-            val centerX = face.bounds.centerX()
-            val centerY = face.bounds.top + face.bounds.height() * 0.3f
-            
-            val paint = Paint().apply {
-                color = Color.WHITE
-                alpha = (config.intensity * 180).toInt()
-                isAntiAlias = true
-            }
-            
-            // 左眼
-            canvas.drawCircle(centerX - face.bounds.width() * 0.15f, centerY, 3f * config.intensity, paint)
-            // 右眼
-            canvas.drawCircle(centerX + face.bounds.width() * 0.15f, centerY, 3f * config.intensity, paint)
+            val cx = face.bounds.centerX()
+            val cy = face.bounds.top + face.bounds.height() * 0.3f
+            val paint = Paint().apply { color = Color.WHITE; alpha = (intensity * 180).toInt(); isAntiAlias = true }
+            canvas.drawCircle(cx - face.bounds.width() * 0.15f, cy, 3f * intensity, paint)
+            canvas.drawCircle(cx + face.bounds.width() * 0.15f, cy, 3f * intensity, paint)
         }
-        
-        return output
+        return out
     }
     
-    private fun applySkinSmoothing(
-        bitmap: Bitmap,
-        faces: List<FaceDetection>,
-        config: EnhancementConfig
-    ): Bitmap {
-        val output = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(output)
-        
+    private fun skinSmooth(bmp: Bitmap, faces: List<FaceDetection>, intensity: Float): Bitmap {
+        val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(out)
         faces.forEach { face ->
             val paint = Paint().apply {
                 isAntiAlias = true
-                maskFilter = BlurMaskFilter(
-                    15f * config.smoothing * config.intensity,
-                    BlurMaskFilter.Blur.NORMAL
-                )
+                maskFilter = BlurMaskFilter(15f * intensity, BlurMaskFilter.Blur.NORMAL)
             }
             canvas.drawOval(face.bounds, paint)
         }
-        
-        return output
+        return out
     }
     
-    private fun applyFaceBrightening(
-        bitmap: Bitmap,
-        faces: List<FaceDetection>,
-        config: EnhancementConfig
-    ): Bitmap {
-        val output = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(output)
-        
-        val brightenMatrix = ColorMatrix().apply {
-            setScale(
-                1f + config.intensity * 0.1f,
-                1f + config.intensity * 0.1f,
-                1f + config.intensity * 0.08f,
-                1f
-            )
-        }
-        
+    private fun brighten(bmp: Bitmap, faces: List<FaceDetection>, intensity: Float): Bitmap {
+        val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(out)
+        val matrix = ColorMatrix().apply { setScale(1f + intensity * 0.1f, 1f + intensity * 0.1f, 1f + intensity * 0.08f, 1f) }
         faces.forEach { face ->
-            val expandedBounds = RectF(face.bounds)
-            expandedBounds.inset(-10f, -10f)
-            
-            val paint = Paint().apply {
-                colorFilter = ColorMatrixColorFilter(brightenMatrix)
-                isAntiAlias = true
-            }
-            canvas.drawOval(expandedBounds, paint)
+            val expanded = RectF(face.bounds).apply { inset(-10f, -10f) }
+            val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(matrix); isAntiAlias = true }
+            canvas.drawOval(expanded, paint)
         }
-        
-        return output
+        return out
     }
     
-    private fun applyAutoBeautify(
-        bitmap: Bitmap,
-        faces: List<FaceDetection>,
-        config: EnhancementConfig
-    ): Bitmap {
-        var output = bitmap
-        
-        // 1. 皮肤平滑
-        output = applySkinSmoothing(output, faces, EnhancementConfig(
-            EnhancementType.SKIN_SMOOTH,
-            config.intensity * 0.6f,
-            config.smoothing
-        ))
-        
-        // 2. 面部提亮
-        output = applyFaceBrightening(output, faces, EnhancementConfig(
-            EnhancementType.BRIGHTEN,
-            config.intensity * 0.4f
-        ))
-        
-        // 3. 眼部增强
-        output = applyEyeEnhancement(output, faces, EnhancementConfig(
-            EnhancementType.EYE_ENHANCE,
-            config.intensity * 0.5f
-        ))
-        
-        return output
+    private fun autoBeautify(bmp: Bitmap, faces: List<FaceDetection>, intensity: Float): Bitmap {
+        var out = skinSmooth(bmp, faces, intensity * 0.6f)
+        out = brighten(out, faces, intensity * 0.4f)
+        return eyeEnhance(out, faces, intensity * 0.5f)
     }
 }

@@ -22,7 +22,7 @@ class SmartPreloader(private val context: Context) {
         val id: String,
         val type: PreloadType,
         val name: String,
-        val priority: Int = 0,
+        var priority: Int = 0,
         var weight: Float = 1f,
         var useCount: Int = 0,
         var lastUsed: Long = 0
@@ -43,9 +43,7 @@ class SmartPreloader(private val context: Context) {
     private val _state = MutableStateFlow(PrewarmState())
     val state: StateFlow<PrewarmState> = _state.asStateFlow()
     
-    init {
-        initializeDefaults()
-    }
+    init { initializeDefaults() }
     
     private fun initializeDefaults() {
         listOf(
@@ -71,15 +69,12 @@ class SmartPreloader(private val context: Context) {
     fun prewarm(priority: List<String>? = null) {
         scope.launch {
             _state.value = PrewarmState(isActive = true)
-            
             val items = priority?.mapNotNull { preloadItems[it] } ?: preloadItems.values.toList()
-            
             items.forEachIndexed { index, item ->
                 _state.value = PrewarmState(isActive = true, progress = (index + 1).toFloat() / items.size, loadedCount = index)
                 preloadItem(item)
                 delay(200)
             }
-            
             _state.value = PrewarmState()
         }
     }
@@ -93,12 +88,8 @@ class SmartPreloader(private val context: Context) {
     }
     
     fun getLoadedItems(): List<String> = loadedItems.keys.toList()
-    
     fun isLoaded(itemId: String): Boolean = loadedItems.contains(itemId)
-    
-    fun release() {
-        scope.cancel()
-    }
+    fun release() = scope.cancel()
     
     private fun recalculateWeights() {
         val maxUse = preloadItems.values.maxOfOrNull { it.useCount }?.coerceAtLeast(1) ?: 1

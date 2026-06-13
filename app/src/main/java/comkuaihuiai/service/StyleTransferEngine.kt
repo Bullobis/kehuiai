@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.graphics.Color
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -18,7 +17,6 @@ class StyleTransferEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "StyleTransferEngine"
-        const val DEFAULT_INTENSITY = 0.7f
     }
     
     enum class ArtStyle(val displayName: String, val emoji: String) {
@@ -43,69 +41,57 @@ class StyleTransferEngine(private val context: Context) {
         val success: Boolean,
         val outputBitmap: Bitmap?,
         val style: ArtStyle,
-        val intensity: Float,
         val processingTimeMs: Long
     )
     
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val matrixCache = mutableMapOf<ArtStyle, ColorMatrix>()
+    private val cache = mutableMapOf<ArtStyle, ColorMatrix>()
     
-    suspend fun applyStyle(
-        input: Bitmap,
-        style: ArtStyle,
-        intensity: Float = DEFAULT_INTENSITY
-    ): TransferResult = withContext(Dispatchers.Default) {
-        val start = System.currentTimeMillis()
-        Log.i(TAG, "🎨 风格: ${style.displayName}")
-        
-        try {
-            val matrix = getStyleMatrix(style, intensity)
-            val output = applyMatrix(input, matrix)
-            TransferResult(true, output, style, intensity, System.currentTimeMillis() - start)
-        } catch (e: Exception) {
-            Log.e(TAG, "失败: ${e.message}")
-            TransferResult(false, null, style, intensity, 0)
+    suspend fun applyStyle(input: Bitmap, style: ArtStyle, intensity: Float = 0.7f): TransferResult = 
+        withContext(Dispatchers.Default) {
+            val start = System.currentTimeMillis()
+            Log.i(TAG, "风格: ${style.displayName}")
+            try {
+                val matrix = getStyleMatrix(style)
+                val output = applyMatrix(input, matrix)
+                TransferResult(true, output, style, System.currentTimeMillis() - start)
+            } catch (e: Exception) {
+                TransferResult(false, null, style, 0)
+            }
         }
-    }
     
     fun recommendStyle(): ArtStyle = ArtStyle.ANIME
-    
     fun getAllStyles(): List<ArtStyle> = ArtStyle.entries.toList()
-    
     fun release() = scope.cancel()
     
-    private fun getStyleMatrix(style: ArtStyle, intensity: Float): ColorMatrix {
-        matrixCache[style]?.let { return it }
-        
-        val matrix = when (style) {
-            ArtStyle.VAN_GOGH -> ColorMatrix(floatArrayOf(1.3f, 0.1f, 0.1f, 0f, 10f, 0.1f, 1.2f, 0.1f, 0f, 5f, 0.1f, 0.2f, 1.4f, 0f, 20f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.PICASSO -> ColorMatrix(floatArrayOf(1.5f, 0f, 0f, 0f, -30f, 0f, 1.2f, 0f, 0f, -10f, 0f, 0f, 1.1f, 0f, 10f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.MONET -> ColorMatrix(floatArrayOf(1.1f, 0.1f, 0.1f, 0f, 15f, 0.1f, 1.1f, 0.1f, 0f, 10f, 0.1f, 0.1f, 1.0f, 0f, 20f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.HOKUSAI -> ColorMatrix(floatArrayOf(1.2f, 0.1f, 0.1f, 0f, 0f, 0.1f, 1.1f, 0.2f, 0f, 10f, 0.1f, 0.2f, 1.0f, 0f, 30f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.KANDINSKY -> ColorMatrix(floatArrayOf(1.5f, 0f, 0f, 0f, -20f, 0f, 1.5f, 0f, 0f, -10f, 0f, 0f, 1.5f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.POP_ART -> ColorMatrix(floatArrayOf(1.8f, 0f, 0f, 0f, -50f, 0f, 1.8f, 0f, 0f, -50f, 0f, 0f, 1.8f, 0f, -50f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.CYBERPUNK -> ColorMatrix(floatArrayOf(1.2f, 0f, 0.3f, 0f, 0f, 0f, 1.0f, 0.2f, 0f, 20f, 0.3f, 0.2f, 1.3f, 0f, 40f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.STEAM_PUNK -> ColorMatrix(floatArrayOf(1.2f, 0.2f, 0.1f, 0f, 20f, 0.1f, 1.0f, 0.1f, 0f, 10f, 0f, 0f, 0.8f, 0f, -10f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.CHINESE_INK -> ColorMatrix(floatArrayOf(0.3f, 0.3f, 0.3f, 0f, 120f, 0.3f, 0.3f, 0.3f, 0f, 120f, 0.3f, 0.3f, 0.3f, 0f, 120f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.UKIYO_E -> ColorMatrix(floatArrayOf(1.1f, 0.2f, 0.1f, 0f, 10f, 0.1f, 1.0f, 0.2f, 0f, 15f, 0f, 0.1f, 0.9f, 0f, 25f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.COMIC -> ColorMatrix(floatArrayOf(1.5f, 0f, 0f, 0f, -30f, 0f, 1.5f, 0f, 0f, -30f, 0f, 0f, 1.5f, 0f, -30f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.ANIME -> ColorMatrix(floatArrayOf(1.1f, 0f, 0f, 0f, 10f, 0f, 1.1f, 0f, 0f, 10f, 0f, 0f, 1.2f, 0f, 20f, 0f, 0f, 0f, 1f, 0f)).apply { setSaturation(1.4f) }
-            ArtStyle.OIL_PAINTING -> ColorMatrix(floatArrayOf(1.1f, 0f, 0f, 0f, 5f, 0f, 1.1f, 0f, 0f, 5f, 0f, 0f, 1.1f, 0f, 5f, 0f, 0f, 0f, 1f, 0f)).apply { setSaturation(1.2f) }
-            ArtStyle.VINTAGE -> ColorMatrix(floatArrayOf(1.1f, 0.1f, 0.1f, 0f, 20f, 0.1f, 1.0f, 0.1f, 0f, 10f, 0f, 0.1f, 0.9f, 0f, -10f, 0f, 0f, 0f, 1f, 0f))
-            ArtStyle.HDR -> ColorMatrix(floatArrayOf(1.3f, 0f, 0f, 0f, 0f, 0f, 1.3f, 0f, 0f, 0f, 0f, 0f, 1.3f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+    private fun getStyleMatrix(style: ArtStyle): ColorMatrix {
+        cache[style]?.let { return it }
+        val m = when (style) {
+            ArtStyle.VAN_GOGH -> ColorMatrix(floatArrayOf(1.3f,0.1f,0.1f,0f,10f, 0.1f,1.2f,0.1f,0f,5f, 0.1f,0.2f,1.4f,0f,20f, 0f,0f,0f,1f,0f))
+            ArtStyle.PICASSO -> ColorMatrix(floatArrayOf(1.5f,0f,0f,0f,-30f, 0f,1.2f,0f,0f,-10f, 0f,0f,1.1f,0f,10f, 0f,0f,0f,1f,0f))
+            ArtStyle.MONET -> ColorMatrix(floatArrayOf(1.1f,0.1f,0.1f,0f,15f, 0.1f,1.1f,0.1f,0f,10f, 0.1f,0.1f,1.0f,0f,20f, 0f,0f,0f,1f,0f))
+            ArtStyle.HOKUSAI -> ColorMatrix(floatArrayOf(1.2f,0.1f,0.1f,0f,0f, 0.1f,1.1f,0.2f,0f,10f, 0.1f,0.2f,1.0f,0f,30f, 0f,0f,0f,1f,0f))
+            ArtStyle.KANDINSKY -> ColorMatrix(floatArrayOf(1.5f,0f,0f,0f,-20f, 0f,1.5f,0f,0f,-10f, 0f,0f,1.5f,0f,0f, 0f,0f,0f,1f,0f))
+            ArtStyle.POP_ART -> ColorMatrix(floatArrayOf(1.8f,0f,0f,0f,-50f, 0f,1.8f,0f,0f,-50f, 0f,0f,1.8f,0f,-50f, 0f,0f,0f,1f,0f))
+            ArtStyle.CYBERPUNK -> ColorMatrix(floatArrayOf(1.2f,0f,0.3f,0f,0f, 0f,1.0f,0.2f,0f,20f, 0.3f,0.2f,1.3f,0f,40f, 0f,0f,0f,1f,0f))
+            ArtStyle.STEAM_PUNK -> ColorMatrix(floatArrayOf(1.2f,0.2f,0.1f,0f,20f, 0.1f,1.0f,0.1f,0f,10f, 0f,0f,0.8f,0f,-10f, 0f,0f,0f,1f,0f))
+            ArtStyle.CHINESE_INK -> ColorMatrix(floatArrayOf(0.3f,0.3f,0.3f,0f,120f, 0.3f,0.3f,0.3f,0f,120f, 0.3f,0.3f,0.3f,0f,120f, 0f,0f,0f,1f,0f))
+            ArtStyle.UKIYO_E -> ColorMatrix(floatArrayOf(1.1f,0.2f,0.1f,0f,10f, 0.1f,1.0f,0.2f,0f,15f, 0f,0.1f,0.9f,0f,25f, 0f,0f,0f,1f,0f))
+            ArtStyle.COMIC -> ColorMatrix(floatArrayOf(1.5f,0f,0f,0f,-30f, 0f,1.5f,0f,0f,-30f, 0f,0f,1.5f,0f,-30f, 0f,0f,0f,1f,0f))
+            ArtStyle.ANIME -> ColorMatrix(floatArrayOf(1.1f,0f,0f,0f,10f, 0f,1.1f,0f,0f,10f, 0f,0f,1.2f,0f,20f, 0f,0f,0f,1f,0f)).apply { setSaturation(1.4f) }
+            ArtStyle.OIL_PAINTING -> ColorMatrix(floatArrayOf(1.1f,0f,0f,0f,5f, 0f,1.1f,0f,0f,5f, 0f,0f,1.1f,0f,5f, 0f,0f,0f,1f,0f)).apply { setSaturation(1.2f) }
+            ArtStyle.VINTAGE -> ColorMatrix(floatArrayOf(1.1f,0.1f,0.1f,0f,20f, 0.1f,1.0f,0.1f,0f,10f, 0f,0.1f,0.9f,0f,-10f, 0f,0f,0f,1f,0f))
+            ArtStyle.HDR -> ColorMatrix(floatArrayOf(1.3f,0f,0f,0f,0f, 0f,1.3f,0f,0f,0f, 0f,0f,1.3f,0f,0f, 0f,0f,0f,1f,0f))
         }
-        
-        matrixCache[style] = matrix
-        return matrix
+        cache[style] = m
+        return m
     }
     
     private fun applyMatrix(bitmap: Bitmap, matrix: ColorMatrix): Bitmap {
-        val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-        val paint = Paint().apply {
-            colorFilter = ColorMatrixColorFilter(matrix)
-        }
+        val out = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(matrix) }
         canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        return output
+        return out
     }
 }
