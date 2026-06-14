@@ -229,14 +229,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text("🎨 可绘AI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("版本 3.0.0", style = MaterialTheme.typography.bodyMedium)
+                        Text("版本 3.6.0", style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "内置 Z-Image 模型支持",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            "阿里巴巴通义实验室 Tongyi-MAI",
+                            "内置高性能图像生成引擎",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

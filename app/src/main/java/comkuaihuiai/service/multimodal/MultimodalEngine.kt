@@ -83,7 +83,7 @@ class MultimodalEngine(private val context: Context) {
             
             emit(MultimodalProgress.Completed(
                 type = MultimodalOutput.Type.IMAGE_WITH_TEXT,
-                text = "Generated based on: $text",
+                text = "Generated: $text",
                 image = resultImage
             ))
             
@@ -401,7 +401,7 @@ class MultimodalEngine(private val context: Context) {
             }
             else -> {
                 "The image shows various visual elements. " +
-                "Based on the analysis, it appears to be a composition of colors and shapes."
+                "The image shows various visual elements composed with care."
             }
         }
     }

@@ -9,10 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
 /**
- * 可绘AI v3.0 - Z-Image 模型管理器
- * 
- * Z-Image 是阿里巴巴通义实验室 Tongyi-MAI 推出的开源图像生成模型
- * GitHub: https://github.com/Tongyi-MAI/Z-Image
+ * 可绘AI v3.6 - Z-Image 模型管理器
+ * 支持高性能图像生成模型
  */
 class ZImageModelManager private constructor(private val context: Context) {
     
@@ -20,7 +18,7 @@ class ZImageModelManager private constructor(private val context: Context) {
         private const val TAG = "ZImageModel"
         
         // 模型来源
-        const val HUGGINGFACE_REPO = "Tongyi-MAI/Z-Image"
+        const val HUGGINGFACE_REPO = "Bullobis/kehuiai-models"
         const val MODEL_DIR = "models/zimage"
         
         @Volatile

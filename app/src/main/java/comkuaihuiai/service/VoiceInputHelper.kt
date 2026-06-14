@@ -14,45 +14,36 @@ import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 可绘AI v3.5.0 - 语音输入助手
+ * 可绘AI v3.6.0 - 语音输入助手
  * 
- * 🎤 功能：
- * ✅ 语音转文字提示词
- * ✅ 多语言识别
- * ✅ 实时字幕
- * ✅ 语音命令控制
- * ✅ TTS 语音播报
+ * 功能：
+ * - 语音转文字
+ * - 语音命令控制
+ * - 文字转语音播报
+ * - 多语言支持
  */
 class VoiceInputHelper(private val context: Context) {
 
     companion object {
-        private const val TAG = "VoiceInputHelper"
+        private const val TAG = "VoiceInput"
         
-        // 支持的语言
-        val SUPPORTED_LANGUAGES = mapOf(
-            "zh-CN" to "中文",
-            "en-US" to "English",
-            "ja-JP" to "日本語",
-            "ko-KR" to "한국어",
-            "fr-FR" to "Français",
-            "de-DE" to "Deutsch"
-        )
+        // 静默阈值
+        private const val SILENCE_THRESHOLD_MS = 2000
+        private const val MIN_AUDIO_LEVEL = 100
     }
     
-    // ==================== 数据模型 ====================
-    
     /**
-     * 识别状态
+     * 语音状态
      */
-    enum class RecognitionState {
+    enum class VoiceState {
         IDLE,           // 空闲
-        READY,          // 就绪
         LISTENING,      // 监听中
         PROCESSING,     // 处理中
-        ERROR,          // 错误
-        NOT_AVAILABLE   // 不可用
+        SPEAKING,       // 播报中
+        ERROR           // 错误
     }
     
     /**
@@ -60,291 +51,338 @@ class VoiceInputHelper(private val context: Context) {
      */
     data class RecognitionResult(
         val text: String,
-        val confidence: Float = 1f,
-        val language: String = "zh-CN",
-        val isFinal: Boolean = false,
-        val alternatives: List<String> = emptyList()
+        val confidence: Float,
+        val language: String,
+        val alternatives: List<String> = emptyList(),
+        val isFinal: Boolean = false
     )
     
     /**
-     * 语音命令
+     * 命令
      */
     data class VoiceCommand(
         val action: CommandAction,
-        val params: Map<String, Any> = emptyMap(),
-        val confidence: Float = 1f
+        val parameters: Map<String, Any> = emptyMap(),
+        val confidence: Float
     )
     
     enum class CommandAction {
-        GENERATE,       // 生成
-        STOP,           // 停止
-        SAVE,           // 保存
-        SHARE,          // 分享
-        UNDO,           // 撤销
-        REDO,           // 重做
-        CLEAR,          // 清除
-        SET_STYLE,      // 设置风格
-        SET_MODEL,      // 设置模型
-        SET_STEPS,      // 设置步数
-        CHANGE_LANGUAGE // 切换语言
+        GENERATE,      // 生成
+        STOP,          // 停止
+        UNDO,          // 撤销
+        REDO,          // 重做
+        SAVE,          // 保存
+        SHARE,         // 分享
+        SET_STYLE,     // 设置风格
+        SET_MODEL,     // 设置模型
+        HELP,          // 帮助
+        UNKNOWN        // 未知
     }
     
     /**
-     * TTS 配置
+     * TTS 状态
      */
-    data class TTSConfig(
-        val language: String = "zh-CN",
+    data class TTSState(
+        val isReady: Boolean = false,
+        val isSpeaking: Boolean = false,
+        val language: String = "en",
         val speechRate: Float = 1.0f,
-        val pitch: Float = 1.0f,
-        val voiceName: String = ""
+        val pitch: Float = 1.0f
     )
     
-    // ==================== 核心组件 ====================
-    
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var textToSpeech: TextToSpeech? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val handler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
+    
+    // 语音识别
+    private var speechRecognizer: SpeechRecognizer? = null
+    
+    // TTS
+    private var textToSpeech: TextToSpeech? = null
+    private var ttsState = MutableStateFlow(TTSState())
     
     // 状态
-    private val _state = MutableStateFlow(RecognitionState.IDLE)
-    val state: StateFlow<RecognitionState> = _state.asStateFlow()
+    private val voiceState = MutableStateFlow(VoiceState.IDLE)
+    private val lastResult = MutableStateFlow<RecognitionResult?>(null)
+    private val audioLevel = MutableStateFlow(0)
     
-    private val _interimText = MutableStateFlow("")
-    val interimText: StateFlow<String> = _interimText.asStateFlow()
+    private val isListening = AtomicBoolean(false)
+    private val isTtsReady = AtomicBoolean(false)
     
-    private val _finalText = MutableStateFlow("")
-    val finalText: StateFlow<String> = _finalText.asStateFlow()
+    // 监听器
+    private var onResultListener: ((RecognitionResult) -> Unit)? = null
+    private var onCommandListener: ((VoiceCommand) -> Unit)? = null
+    private var onErrorListener: ((String) -> Unit)? = null
     
-    private val _recognitionResults = MutableSharedFlow<RecognitionResult>()
+    // Flow
+    private val _recognitionResults = MutableSharedFlow<RecognitionResult>(extraBufferCapacity = 64)
     val recognitionResults: SharedFlow<RecognitionResult> = _recognitionResults.asSharedFlow()
     
-    private val _voiceCommands = MutableSharedFlow<VoiceCommand>()
+    private val _voiceCommands = MutableSharedFlow<VoiceCommand>(extraBufferCapacity = 16)
     val voiceCommands: SharedFlow<VoiceCommand> = _voiceCommands.asSharedFlow()
     
-    private var currentLanguage = "zh-CN"
-    private var isTTSReady = false
-    
-    // 命令关键词映射
-    private val commandKeywords = mapOf(
-        CommandAction.GENERATE to listOf("生成", "create", "生成图片", "开始生成"),
-        CommandAction.STOP to listOf("停止", "stop", "取消", "终止"),
-        CommandAction.SAVE to listOf("保存", "save", "存储"),
-        CommandAction.SHARE to listOf("分享", "share", "发送"),
-        CommandAction.UNDO to listOf("撤销", "undo", "回退"),
-        CommandAction.REDO to listOf("重做", "redo", "恢复"),
-        CommandAction.CLEAR to listOf("清除", "clear", "清空", "删除"),
-        CommandAction.SET_STYLE to listOf("风格", "style", "设置风格"),
-        CommandAction.SET_MODEL to listOf("模型", "model", "设置模型"),
-        CommandAction.SET_STEPS to listOf("步数", "steps", "设置步数"),
-        CommandAction.CHANGE_LANGUAGE to listOf("语言", "language", "切换语言")
-    )
-    
-    // ==================== 初始化 ====================
-    
-    init {
-        initializeSpeechRecognizer()
-        initializeTTS()
-    }
-    
-    private fun initializeSpeechRecognizer() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            Log.e(TAG, "语音识别不可用")
-            _state.value = RecognitionState.NOT_AVAILABLE
-            return
-        }
-        
-        try {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-            speechRecognizer?.setRecognitionListener(recognitionListener)
-            _state.value = RecognitionState.READY
-        } catch (e: Exception) {
-            Log.e(TAG, "初始化语音识别失败: ${e.message}")
-            _state.value = RecognitionState.NOT_AVAILABLE
-        }
-    }
-    
-    private fun initializeTTS() {
-        textToSpeech = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                isTTSReady = true
-                textToSpeech?.language = Locale.CHINESE
-                
-                textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
-                    override fun onDone(utteranceId: String?) {}
-                    override fun onError(utteranceId: String?) {}
-                })
-            }
-        }
-    }
-    
-    // ==================== 公开 API ====================
-    
     /**
-     * 开始语音输入
+     * 初始化
      */
-    fun startListening(language: String = currentLanguage) {
-        if (_state.value == RecognitionState.LISTENING) {
-            Log.d(TAG, "已经在监听中")
+    fun initialize() {
+        initSpeechRecognizer()
+        initTextToSpeech()
+        Log.i(TAG, "VoiceInputHelper 已初始化")
+    }
+    
+    /**
+     * 设置结果监听器
+     */
+    fun setOnResultListener(listener: (RecognitionResult) -> Unit) {
+        onResultListener = listener
+    }
+    
+    /**
+     * 设置命令监听器
+     */
+    fun setOnCommandListener(listener: (VoiceCommand) -> Unit) {
+        onCommandListener = listener
+    }
+    
+    /**
+     * 设置错误监听器
+     */
+    fun setOnErrorListener(listener: (String) -> Unit) {
+        onErrorListener = listener
+    }
+    
+    /**
+     * 开始监听
+     */
+    fun startListening(language: String = "zh-CN") {
+        if (isListening.get()) {
+            Log.w(TAG, "已经在监听中")
             return
         }
         
-        currentLanguage = language
-        
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
+        if (speechRecognizer == null) {
+            initSpeechRecognizer()
         }
         
         try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_THRESHOLD_MS)
+            }
+            
             speechRecognizer?.startListening(intent)
-            _state.value = RecognitionState.LISTENING
-            _interimText.value = ""
-            Log.i(TAG, "🎤 开始语音监听...")
+            isListening.set(true)
+            voiceState.value = VoiceState.LISTENING
+            
+            Log.i(TAG, "开始监听: $language")
         } catch (e: Exception) {
-            Log.e(TAG, "启动语音监听失败: ${e.message}")
-            _state.value = RecognitionState.ERROR
+            Log.e(TAG, "启动监听失败: ${e.message}")
+            onErrorListener?.invoke("无法启动语音识别: ${e.message}")
         }
     }
     
     /**
-     * 停止语音输入
+     * 停止监听
      */
     fun stopListening() {
-        speechRecognizer?.stopListening()
-        _state.value = RecognitionState.READY
-        Log.i(TAG, "🛑 停止语音监听")
+        if (!isListening.get()) return
+        
+        try {
+            speechRecognizer?.stopListening()
+        } catch (e: Exception) {
+            Log.e(TAG, "停止监听失败: ${e.message}")
+        }
+        
+        isListening.set(false)
+        voiceState.value = VoiceState.IDLE
+        Log.i(TAG, "停止监听")
     }
     
     /**
-     * 取消语音输入
+     * 取消监听
      */
     fun cancelListening() {
-        speechRecognizer?.cancel()
-        _state.value = RecognitionState.READY
-        _interimText.value = ""
+        try {
+            speechRecognizer?.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "取消监听失败: ${e.message}")
+        }
+        
+        isListening.set(false)
+        voiceState.value = VoiceState.IDLE
     }
     
     /**
-     * 文字转语音 (TTS)
+     * 语音播报
      */
     fun speak(
         text: String,
-        config: TTSConfig = TTSConfig(),
-        onComplete: (() -> Unit)? = null
+        language: String = "en",
+        speechRate: Float = 1.0f,
+        pitch: Float = 1.0f
     ) {
-        if (!isTTSReady) {
-            Log.e(TAG, "TTS 还未就绪")
+        if (!isTtsReady.get()) {
+            Log.w(TAG, "TTS 未就绪")
             return
         }
         
+        voiceState.value = VoiceState.SPEAKING
+        
         textToSpeech?.apply {
-            setSpeechRate(config.speechRate)
-            setPitch(config.pitch)
-            
-            if (config.voiceName.isNotEmpty()) {
-                val voice = voices?.find { it.name.contains(config.voiceName) }
-                voice?.let { setVoice(it) }
-            }
-            
-            val locale = when (config.language) {
-                "zh-CN" -> Locale.CHINA
-                "en-US" -> Locale.US
-                "ja-JP" -> Locale.JAPAN
-                "ko-KR" -> Locale.KOREA
-                "fr-FR" -> Locale.FRANCE
-                "de-DE" -> Locale.GERMANY
-                else -> Locale.getDefault()
-            }
-            language = locale
+            setSpeechRate(speechRate)
+            setPitch(pitch)
+            setLanguage(Locale.forLanguageTag(language))
             
             speak(text, TextToSpeech.QUEUE_FLUSH, null, "utterance_${System.currentTimeMillis()}")
         }
-        
-        onComplete?.let {
-            handler.postDelayed(it, text.length * 100L) // 估算播报时间
-        }
     }
     
     /**
-     * 停止 TTS
+     * 停止播报
      */
     fun stopSpeaking() {
         textToSpeech?.stop()
+        voiceState.value = VoiceState.IDLE
     }
     
     /**
-     * 解析语音命令
+     * 设置 TTS 语速
      */
-    fun parseCommand(text: String): VoiceCommand? {
-        val lowerText = text.lowercase()
-        
-        for ((action, keywords) in commandKeywords) {
-            for (keyword in keywords) {
-                if (keyword.lowercase() in lowerText) {
-                    // 提取参数
-                    val params = extractParams(lowerText, action)
-                    
-                    return VoiceCommand(
-                        action = action,
-                        params = params,
-                        confidence = 0.9f
-                    )
-                }
-            }
-        }
-        
-        return null
+    fun setSpeechRate(rate: Float) {
+        textToSpeech?.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
+        ttsState.update { it.copy(speechRate = rate) }
     }
     
     /**
-     * 设置识别语言
+     * 设置 TTS 音调
      */
-    fun setLanguage(language: String) {
-        currentLanguage = language
+    fun setPitch(pitch: Float) {
+        textToSpeech?.setPitch(pitch.coerceIn(0.5f, 2.0f))
+        ttsState.update { it.copy(pitch = pitch) }
     }
     
     /**
-     * 获取支持的语言
+     * 获取 TTS 状态
      */
-    fun getSupportedLanguages(): Map<String, String> = SUPPORTED_LANGUAGES
+    fun getTtsState(): TTSState = ttsState.value
+    
+    /**
+     * 获取语音状态
+     */
+    fun getVoiceState(): VoiceState = voiceState.value
+    
+    /**
+     * 是否正在监听
+     */
+    fun isCurrentlyListening(): Boolean = isListening.get()
+    
+    /**
+     * 获取最后识别结果
+     */
+    fun getLastResult(): RecognitionResult? = lastResult.value
     
     /**
      * 释放资源
      */
     fun release() {
+        stopListening()
+        stopSpeaking()
+        
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e(TAG, "销毁语音识别器失败: ${e.message}")
+        }
+        
+        try {
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+        } catch (e: Exception) {
+            Log.e(TAG, "销毁TTS失败: ${e.message}")
+        }
+        
         scope.cancel()
-        speechRecognizer?.destroy()
-        textToSpeech?.stop()
-        textToSpeech?.shutdown()
-        Log.i(TAG, "🔴 VoiceInputHelper 已释放")
+        Log.i(TAG, "VoiceInputHelper 已释放")
     }
     
     // ==================== 私有方法 ====================
     
-    private val recognitionListener = object : RecognitionListener {
+    private fun initSpeechRecognizer() {
+        try {
+            if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+                speechRecognizer?.setRecognitionListener(createRecognitionListener())
+                Log.i(TAG, "语音识别器已初始化")
+            } else {
+                Log.w(TAG, "设备不支持语音识别")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "初始化语音识别器失败: ${e.message}")
+        }
+    }
+    
+    private fun initTextToSpeech() {
+        textToSpeech = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                isTtsReady.set(true)
+                ttsState.update { it.copy(isReady = true) }
+                
+                textToSpeech?.apply {
+                    setLanguage(Locale.US)
+                    setSpeechRate(1.0f)
+                    setPitch(1.0f)
+                }
+                
+                Log.i(TAG, "TTS 已初始化")
+            } else {
+                Log.e(TAG, "TTS 初始化失败: $status")
+            }
+        }
+        
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                voiceState.value = VoiceState.SPEAKING
+            }
+            
+            override fun onDone(utteranceId: String?) {
+                mainHandler.post {
+                    voiceState.value = VoiceState.IDLE
+                }
+            }
+            
+            override fun onError(utteranceId: String?) {
+                mainHandler.post {
+                    voiceState.value = VoiceState.ERROR
+                }
+            }
+        })
+    }
+    
+    private fun createRecognitionListener() = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
-            _state.value = RecognitionState.READY
+            Log.d(TAG, "准备接收语音")
+            voiceState.value = VoiceState.LISTENING
         }
         
         override fun onBeginningOfSpeech() {
-            _state.value = RecognitionState.LISTENING
+            Log.d(TAG, "开始说话")
         }
         
         override fun onRmsChanged(rmsdB: Float) {
-            // 可以用来显示音量指示
+            // 更新音频级别
+            val level = (rmsdB * 10).toInt().coerceIn(0, 100)
+            audioLevel.value = level
         }
         
-        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onBufferReceived(buffer: ByteArray?) {
+            // 音频缓冲
+        }
         
         override fun onEndOfSpeech() {
-            _state.value = RecognitionState.PROCESSING
+            Log.d(TAG, "结束说话")
+            voiceState.value = VoiceState.PROCESSING
         }
         
         override fun onError(error: Int) {
@@ -355,134 +393,147 @@ class VoiceInputHelper(private val context: Context) {
                 SpeechRecognizer.ERROR_NETWORK -> "网络错误"
                 SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "网络超时"
                 SpeechRecognizer.ERROR_NO_MATCH -> "没有匹配结果"
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别服务忙"
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别器忙"
                 SpeechRecognizer.ERROR_SERVER -> "服务器错误"
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "没有语音输入"
                 else -> "未知错误"
             }
             
-            Log.e(TAG, "语音识别错误: $errorMessage")
-            _state.value = RecognitionState.ERROR
+            Log.e(TAG, "识别错误: $errorMessage (code: $error)")
+            isListening.set(false)
+            voiceState.value = VoiceState.IDLE
             
-            // 自动重试
-            if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                handler.postDelayed({
-                    if (_state.value == RecognitionState.ERROR) {
-                        startListening()
-                    }
-                }, 1000)
+            if (error != SpeechRecognizer.ERROR_NO_MATCH && 
+                error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                onErrorListener?.invoke(errorMessage)
             }
         }
         
         override fun onResults(results: Bundle?) {
+            Log.d(TAG, "收到识别结果")
+            
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             if (!matches.isNullOrEmpty()) {
-                val text = matches[0]
-                val alternatives = matches.drop(1)
-                val confidence = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)?.firstOrNull() ?: 1f
-                
                 val result = RecognitionResult(
-                    text = text,
-                    confidence = confidence,
-                    language = currentLanguage,
-                    isFinal = true,
-                    alternatives = alternatives
+                    text = matches[0],
+                    confidence = 0.9f,
+                    language = "zh-CN",
+                    alternatives = matches.drop(1),
+                    isFinal = true
                 )
                 
-                _finalText.value = text
-                _recognitionResults.tryEmit(result)
+                lastResult.value = result
+                isListening.set(false)
+                voiceState.value = VoiceState.IDLE
                 
-                // 尝试解析为命令
-                parseCommand(text)?.let { command ->
-                    _voiceCommands.tryEmit(command)
+                // 通知监听器
+                onResultListener?.invoke(result)
+                scope.launch {
+                    _recognitionResults.emit(result)
                 }
                 
-                Log.i(TAG, "✅ 识别结果: $text")
+                // 解析命令
+                val command = parseCommand(result.text)
+                if (command.action != CommandAction.UNKNOWN) {
+                    onCommandListener?.invoke(command)
+                    _voiceCommands.tryEmit(command)
+                }
             }
-            
-            _state.value = RecognitionState.READY
-            _interimText.value = ""
         }
         
         override fun onPartialResults(partialResults: Bundle?) {
             val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             if (!matches.isNullOrEmpty()) {
-                _interimText.value = matches[0]
+                val result = RecognitionResult(
+                    text = matches[0],
+                    confidence = 0.7f,
+                    language = "zh-CN",
+                    isFinal = false
+                )
+                
+                // 临时更新状态
+                lastResult.value = result
+                onResultListener?.invoke(result)
             }
         }
         
-        override fun onEvent(eventType: Int, params: Bundle?) {}
-    }
-    
-    /**
-     * 提取命令参数
-     */
-    private fun extractParams(text: String, action: CommandAction): Map<String, Any> {
-        val params = mutableMapOf<String, Any>()
-        
-        when (action) {
-            CommandAction.SET_STEPS -> {
-                // 提取数字
-                val numbers = Regex("\\d+").findAll(text).lastOrNull()?.value?.toIntOrNull()
-                if (numbers != null) {
-                    params["steps"] = numbers
-                }
-            }
-            CommandAction.SET_STYLE -> {
-                // 提取风格关键词
-                val styles = listOf("动漫", "油画", "写实", "水彩", "素描")
-                for (style in styles) {
-                    if (style in text) {
-                        params["style"] = style
-                        break
-                    }
-                }
-            }
-            CommandAction.SET_MODEL -> {
-                // 提取模型关键词
-                val models = listOf("SDXL", "SD1.5", "Flux", "Z-Image")
-                for (model in models) {
-                    if (model in text) {
-                        params["model"] = model
-                        break
-                    }
-                }
-            }
-            CommandAction.CHANGE_LANGUAGE -> {
-                // 提取语言
-                SUPPORTED_LANGUAGES.forEach { (code, name) ->
-                    if (name in text || code in text) {
-                        params["language"] = code
-                    }
-                }
-            }
-            else -> {}
+        override fun onEvent(eventType: Int, params: Bundle?) {
+            // 事件处理
         }
-        
-        return params
     }
     
-    // ==================== 扩展函数 ====================
+    private fun parseCommand(text: String): VoiceCommand {
+        val lowerText = text.lowercase()
+        
+        return when {
+            // 生成命令
+            lowerText.contains("生成") || lowerText.contains("create") ||
+            lowerText.contains("生成图片") -> {
+                VoiceCommand(CommandAction.GENERATE, emptyMap(), 0.9f)
+            }
+            
+            // 停止命令
+            lowerText.contains("停止") || lowerText.contains("stop") ||
+            lowerText.contains("取消") -> {
+                VoiceCommand(CommandAction.STOP, emptyMap(), 0.9f)
+            }
+            
+            // 撤销命令
+            lowerText.contains("撤销") || lowerText.contains("undo") ||
+            lowerText.contains("上一步") -> {
+                VoiceCommand(CommandAction.UNDO, emptyMap(), 0.85f)
+            }
+            
+            // 重做命令
+            lowerText.contains("重做") || lowerText.contains("redo") ||
+            lowerText.contains("下一步") -> {
+                VoiceCommand(CommandAction.REDO, emptyMap(), 0.85f)
+            }
+            
+            // 保存命令
+            lowerText.contains("保存") || lowerText.contains("save") ||
+            lowerText.contains("存储") -> {
+                VoiceCommand(CommandAction.SAVE, emptyMap(), 0.85f)
+            }
+            
+            // 分享命令
+            lowerText.contains("分享") || lowerText.contains("share") ||
+            lowerText.contains("发送") -> {
+                VoiceCommand(CommandAction.SHARE, emptyMap(), 0.8f)
+            }
+            
+            // 设置风格
+            lowerText.contains("风格") || lowerText.contains("style") -> {
+                val style = extractStyle(text)
+                VoiceCommand(CommandAction.SET_STYLE, mapOf("style" to style), 0.8f)
+            }
+            
+            // 设置模型
+            lowerText.contains("模型") || lowerText.contains("model") -> {
+                val model = extractModel(text)
+                VoiceCommand(CommandAction.SET_MODEL, mapOf("model" to model), 0.8f)
+            }
+            
+            // 帮助
+            lowerText.contains("帮助") || lowerText.contains("help") ||
+            lowerText.contains("怎么用") -> {
+                VoiceCommand(CommandAction.HELP, emptyMap(), 0.9f)
+            }
+            
+            else -> VoiceCommand(CommandAction.UNKNOWN, emptyMap(), 0f)
+        }
+    }
     
-    /**
-     * 检查是否支持语音输入
-     */
-    fun isAvailable(): Boolean = _state.value != RecognitionState.NOT_AVAILABLE
+    private fun extractStyle(text: String): String {
+        val styles = listOf("动漫", "anime", "写实", "realistic", "油画", "水彩", 
+                          "赛博朋克", "奇幻", "像素", "素描")
+        
+        return styles.find { text.contains(it) } ?: "默认"
+    }
     
-    /**
-     * 检查是否正在监听
-     */
-    fun isListening(): Boolean = _state.value == RecognitionState.LISTENING
-    
-    /**
-     * 获取状态描述
-     */
-    fun getStateDescription(): String = when (_state.value) {
-        RecognitionState.IDLE -> "空闲"
-        RecognitionState.READY -> "就绪"
-        RecognitionState.LISTENING -> "正在聆听..."
-        RecognitionState.PROCESSING -> "处理中..."
-        RecognitionState.ERROR -> "出错了"
-        RecognitionState.NOT_AVAILABLE -> "不支持语音"
+    private fun extractModel(text: String): String {
+        val models = listOf("SDXL", "SD1.5", "anything", "illustrious")
+        
+        return models.find { text.contains(it) } ?: "默认"
     }
 }

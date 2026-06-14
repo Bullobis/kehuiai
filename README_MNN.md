@@ -32,7 +32,7 @@ KuaiHuiAI/
 │   │   ├── cpp/src/
 │   │   │   └── kuaihui_native_engine.cpp  # MNN JNI 推理实现
 │   │   ├── java/comkuaihuiai/service/native/
-│   │   │   ├── LocalDreamEngine.kt        # Kotlin 推理引擎
+│   │   │   ├── 可绘推理引擎.kt        # Kotlin 推理引擎
 │   │   │   ├── NativeMNNEngine.kt         # MNN 原生调用
 │   │   │   └── NativeUtils.kt            # JNI 声明
 │   │   ├── jniLibs/

@@ -23,7 +23,7 @@ data class SDModel(
     val id: String,
     val name: String,
     val description: String,
-    val baseUrl: String = "https://huggingface.co/xororz/sd-qnn/resolve/main",
+    val baseUrl: String = "https://huggingface.co/Bullobis/kehuiai-models/resolve/main",
     val fileUri: String,
     val approximateSize: String = "1GB",
     val isDownloaded: Boolean = false,

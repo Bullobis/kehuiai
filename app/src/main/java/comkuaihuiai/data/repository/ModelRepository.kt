@@ -44,12 +44,7 @@ class ModelRepository(private val context: Context) {
      * Get download URL for a model
      */
     fun getDownloadUrl(model: SDModel): String {
-        val baseUrl = if (model.runOnCpu || !isNpuSupported()) {
-            "https://huggingface.co/xororz/sd-mnn/resolve/main"
-        } else {
-            "https://huggingface.co/xororz/sd-qnn/resolve/main"
-        }
-        return "$baseUrl/${model.fileUri}"
+        return "https://huggingface.co/Bullobis/kehuiai-models/resolve/main/${model.fileUri}"
     }
     
     /**

@@ -229,7 +229,7 @@ private fun ModelCard(
 }
 
 private fun startDownload(context: Context, model: SDModel) {
-    val baseUrl = "https://huggingface.co/xororz/sd-qnn/resolve/main"
+    val baseUrl = "https://huggingface.co/Bullobis/kehuiai-models/resolve/main"
     val url = "$baseUrl/${model.fileUri}"
     
     val intent = Intent(context, ModelDownloadService::class.java).apply {

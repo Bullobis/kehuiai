@@ -7,7 +7,7 @@
 - [ ] AndroidManifest 更新
 - [ ] 资源文件更新
 
-## 二、Z-Image 模型支持（阿里巴巴通义实验室）
+## 二、Z-Image 模型支持
 - [ ] 添加 `BaseModelType.Z_IMAGE` 枚举
 - [ ] 添加 Z-Image 模型下载器
 - [ ] 添加 Z-Image 推理支持
@@ -40,8 +40,8 @@
 - [ ] 非安全版本（移除安全检查）
 
 ## Z-Image 模型信息
-- 来源：Tongyi-MAI (阿里巴巴通义实验室)
-- GitHub: https://github.com/Tongyi-MAI/Z-Image
+
+
 - License: Apache-2.0
 - Stars: 11500+
 - 特点：开源图像生成模型
