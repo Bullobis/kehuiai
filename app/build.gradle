@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace 'comkuaihuiai'
+    namespace 'com.kehuiai'
     compileSdk 34
 
     lint {
@@ -77,7 +77,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion '1.5.8'
+        kotlinCompilerExtensionVersion '1.5.10'
     }
 }
 
