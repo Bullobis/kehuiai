@@ -498,7 +498,8 @@ class ProfessionalInferenceEngine(private val context: Context) {
                 }
             }
 
-            currentState.set(GenerationState.Completed(results.first(), seed, System.currentTimeMillis() - startTime))
+            val firstResult = results.firstOrNull() ?: throw IllegalStateException("生成失败：没有生成任何图像")
+            currentState.set(GenerationState.Completed(firstResult, seed, System.currentTimeMillis() - startTime))
 
             emit(ProfessionalProgress.Completed(
                 bitmaps = results,

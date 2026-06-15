@@ -592,7 +592,7 @@ class ImageAnalyzer {
         
         // 情绪
         if (mood.keywords.isNotEmpty()) {
-            desc.append("整体氛围${mood.keywords.first()}，")
+            desc.append("整体氛围${mood.keywords.first() ?: "一般"}，")
             desc.append("亮度${if (mood.brightness > 0.5) "较高" else "较低"}，")
             desc.append("色彩${if (mood.saturation > 0.5) "鲜艳" else "柔和"}。")
         }

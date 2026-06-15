@@ -129,15 +129,16 @@ fun GenerationScreen(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
                         }
-                    } else if (generatedImage != null) {
+                    generatedImage?.let { bmp ->
                         Image(
-                            bitmap = generatedImage!!.asImageBitmap(),
+                            bitmap = bmp.asImageBitmap(),
                             contentDescription = "生成的图像",
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(16.dp)),
                             contentScale = ContentScale.Fit
                         )
+                    }
                     } else {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally

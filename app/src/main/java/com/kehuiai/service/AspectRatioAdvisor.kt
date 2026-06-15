@@ -131,6 +131,25 @@ class AspectRatioAdvisor(private val context: Context) {
         }.sortedByDescending { it.second }
 
         // 3. 选择最佳
+        if (candidates.isEmpty()) {
+            val defaultRatio = AspectRatio(
+                id = "16_9",
+                name = "16:9",
+                displayName = "16:9",
+                widthRatio = 16,
+                heightRatio = 9,
+                description = "默认",
+                typicalUse = listOf("通用")
+            )
+            return Recommendation(
+                aspectRatio = defaultRatio,
+                resolution = Pair(1024, 576),
+                reason = "默认推荐",
+                warnings = emptyList(),
+                vramEstimateMb = 2048L,
+                confidence = 0f
+            )
+        }
         val best = candidates.first()
 
         // 4. 计算推荐分辨率

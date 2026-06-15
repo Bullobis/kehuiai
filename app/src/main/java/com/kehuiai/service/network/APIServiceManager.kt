@@ -347,11 +347,14 @@ class APIServiceManager(private val context: Context) {
         connection.connectTimeout = 5000
         connection.readTimeout = 30000
 
-        val reader = BufferedReader(InputStreamReader(connection.inputStream))
-        val response = reader.readText()
-        reader.close()
-
-        return JSONObject(response)
+        return try {
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            reader.close()
+            JSONObject(response)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun getJSONArray(path: String): JSONArray {
@@ -361,11 +364,14 @@ class APIServiceManager(private val context: Context) {
         connection.connectTimeout = 5000
         connection.readTimeout = 30000
 
-        val reader = BufferedReader(InputStreamReader(connection.inputStream))
-        val response = reader.readText()
-        reader.close()
-
-        return JSONArray(response)
+        return try {
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            reader.close()
+            JSONArray(response)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun postJSON(path: String, payload: JSONObject): JSONObject {
@@ -375,16 +381,19 @@ class APIServiceManager(private val context: Context) {
         connection.doOutput = true
         connection.setRequestProperty("Content-Type", "application/json")
 
-        val os = DataOutputStream(connection.outputStream)
-        os.writeBytes(payload.toString())
-        os.flush()
-        os.close()
+        return try {
+            val os = DataOutputStream(connection.outputStream)
+            os.writeBytes(payload.toString())
+            os.flush()
+            os.close()
 
-        val reader = BufferedReader(InputStreamReader(connection.inputStream))
-        val response = reader.readText()
-        reader.close()
-
-        return JSONObject(response)
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            reader.close()
+            JSONObject(response)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun postEmpty(path: String) {
