@@ -9,7 +9,7 @@
  * - 变体探索 (确定性 + 随机性平衡)
  * - 种子哈希分析
  */
-package com.kehui.ai.service
+package com.kehuiai.service
 
 import android.content.Context
 import android.content.SharedPreferences

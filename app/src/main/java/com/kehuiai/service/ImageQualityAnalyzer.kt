@@ -11,7 +11,7 @@
  * - 压缩伪影检测
  * - 整体质量评分 (0-100)
  */
-package com.kehui.ai.service
+package com.kehuiai.service
 
 import android.graphics.Bitmap
 import android.graphics.Color

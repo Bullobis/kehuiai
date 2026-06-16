@@ -69,7 +69,7 @@ fun MainNavigation(repository: GenerationRepository) {
                 VideoGenerationScreen()
             }
             composable(Screen.History.route) {
-                HistoryScreen()
+                HistoryScreen(repository = repository)
             }
             composable(Screen.Models.route) {
                 ModelsScreen(repository = repository)

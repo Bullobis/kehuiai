@@ -9,7 +9,7 @@
  * - 最优参数推荐
  * - 进化式参数优化 (遗传算法)
  */
-package com.kehui.ai.service
+package com.kehuiai.service
 
 import android.util.Log
 import kotlin.math.*

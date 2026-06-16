@@ -52,12 +52,7 @@
             </intent-filter>
         </activity>
         
-        <!-- Download Service -->
-        <service
-            android:name=".service.DownloadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-            
+
         <!-- File Provider for sharing -->
         <provider
             android:name="androidx.core.content.FileProvider"

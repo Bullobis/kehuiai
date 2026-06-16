@@ -23,7 +23,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelsScreen(
-    repository: GenerationRepository
+    @Suppress("UNUSED_PARAMETER") repository: GenerationRepository
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Checkpoint", "LoRA", "VAE", "Embedding", "ControlNet")

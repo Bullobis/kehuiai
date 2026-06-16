@@ -9,7 +9,7 @@
  * - 热门关键词统计
  * - 搜索建议自动补全
  */
-package com.kehui.ai.service
+package com.kehuiai.service
 
 import android.content.Context
 import android.content.SharedPreferences

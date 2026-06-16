@@ -20,6 +20,8 @@ import coil.compose.AsyncImage
 import com.kehuiai.data.model.HistoryItem
 import com.kehuiai.data.model.HistoryStatus
 import com.kehuiai.data.model.SchedulerType
+import com.kehuiai.data.repository.GenerationRepository
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -30,8 +32,12 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
+    repository: GenerationRepository,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
+    val historyItems by repository.getHistory().collectAsState(initial = emptyList())
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -40,38 +46,17 @@ fun HistoryScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ),
                 actions = {
-                    IconButton(onClick = { /* 分享 */ }) {
-                        Icon(Icons.Default.Share, "分享")
+                    if (historyItems.isNotEmpty()) {
+                        IconButton(onClick = { 
+                            scope.launch { repository.clearHistory() }
+                        }) {
+                            Icon(Icons.Default.DeleteSweep, "清空")
+                        }
                     }
                 }
             )
         }
     ) { padding ->
-        // TODO: 从 Repository 获取真实历史数据
-        val historyItems = remember {
-            (1..12).map { idx ->
-                HistoryItem(
-                    id = idx.toString(),
-                    timestamp = System.currentTimeMillis() - idx * 3600000L,
-                    params = com.kehuiai.data.model.GenerationParams(
-                        positivePrompt = "生成的图像 #$idx",
-                        negativePrompt = "",
-                        baseModel = com.kehuiai.data.model.BaseModelType.SD_1_5,
-                        width = 1024,
-                        height = 1024,
-                        steps = 30,
-                        guidanceScale = 7.5f,
-                        seed = System.currentTimeMillis(),
-                        scheduler = SchedulerType.EULER,
-                        batchSize = 1
-                    ),
-                    outputPaths = emptyList(),
-                    thumbnailPath = null,
-                    status = if (idx % 4 == 0) HistoryStatus.FAILED else HistoryStatus.COMPLETED
-                )
-            }
-        }
-        
         if (historyItems.isEmpty()) {
             EmptyHistoryView(modifier = Modifier.padding(padding))
         } else {
@@ -85,7 +70,13 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(historyItems, key = { it.id }) { item ->
-                    HistoryCard(item = item, onClick = { /* 打开详情 */ })
+                    HistoryCard(
+                        item = item, 
+                        onClick = { /* 打开详情 */ },
+                        onDelete = { 
+                            scope.launch { repository.deleteHistoryItem(item) }
+                        }
+                    )
                 }
             }
         }
@@ -125,8 +116,32 @@ private fun EmptyHistoryView(modifier: Modifier = Modifier) {
 @Composable
 private fun HistoryCard(
     item: HistoryItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("删除记录") },
+            text = { Text("确定删除这条历史记录吗？") },
+            confirmButton = {
+                TextButton(onClick = { 
+                    onDelete()
+                    showDeleteDialog = false
+                }) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -145,7 +160,6 @@ private fun HistoryCard(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                // 占位图
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -161,6 +175,22 @@ private fun HistoryCard(
                 }
             }
             
+            // 删除按钮
+            IconButton(
+                onClick = { showDeleteDialog = true },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "删除",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+            
             // 底部信息栏
             Box(
                 modifier = Modifier
@@ -174,7 +204,7 @@ private fun HistoryCard(
                     Column(
                         modifier = Modifier.padding(8.dp)
                     ) {
-                        val promptText = item.params?.positivePrompt ?: "生成的图像"
+                        val promptText = item.params.positivePrompt
                         Text(
                             promptText,
                             style = MaterialTheme.typography.bodySmall,
@@ -203,7 +233,7 @@ private fun HistoryCard(
                     Icons.Default.Error,
                     contentDescription = "生成失败",
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.TopStart)
                         .padding(8.dp)
                         .size(20.dp),
                     tint = MaterialTheme.colorScheme.error

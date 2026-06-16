@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.kehui.ai"
+        applicationId "com.kehuiai.ai"
         minSdk 24
         targetSdk 34
         versionCode 360

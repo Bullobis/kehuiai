@@ -1,5 +1,7 @@
 package com.kehuiai.ui.screens
 
+import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,10 +12,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.kehuiai.service.video.VideoGenerationService
+import com.kehuiai.service.video.VideoEngine
+import com.kehuiai.service.video.VideoProgress
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 /**
  * 可绘AI v3.0 - 视频生成界面
@@ -23,19 +29,40 @@ import com.kehuiai.service.video.VideoGenerationService
 fun VideoGenerationScreen(
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    // 视频引擎
+    val videoEngine = remember { VideoEngine(context) }
     
     // 状态
     var prompt by remember { mutableStateOf("") }
     var negativePrompt by remember { mutableStateOf("") }
     var duration by remember { mutableIntStateOf(4) } // 2-16秒
     var fps by remember { mutableIntStateOf(24) }
-    var resolution by remember { mutableStateOf("720p") }
+    var resolution by remember { mutableIntStateOf(VideoEngine.RESOLUTION_720P) }
     var videoMode by remember { mutableStateOf(VideoMode.TEXT_TO_VIDEO) }
     var isGenerating by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
+    var statusMessage by remember { mutableStateOf("") }
+    var completedPath by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     
-    val resolutions = listOf("480p", "720p", "1080p", "4K")
+    val resolutions = listOf(
+        VideoEngine.RESOLUTION_480P to "480p",
+        VideoEngine.RESOLUTION_720P to "720p",
+        VideoEngine.RESOLUTION_1080P to "1080p",
+        VideoEngine.RESOLUTION_4K to "4K"
+    )
+    
+    // 清理状态
+    LaunchedEffect(isGenerating) {
+        if (!isGenerating) {
+            progress = 0f
+            statusMessage = ""
+            errorMessage = null
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -43,7 +70,17 @@ fun VideoGenerationScreen(
                 title = { Text("🎬 视频生成", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                ),
+                actions = {
+                    if (isGenerating) {
+                        IconButton(onClick = { 
+                            videoEngine.cancel()
+                            isGenerating = false
+                        }) {
+                            Icon(Icons.Default.Stop, "停止")
+                        }
+                    }
+                }
             )
         }
     ) { padding ->
@@ -139,11 +176,11 @@ fun VideoGenerationScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    resolutions.forEach { res ->
+                    resolutions.forEach { (res, name) ->
                         FilterChip(
                             selected = resolution == res,
                             onClick = { resolution = res },
-                            label = { Text(res) }
+                            label = { Text(name) }
                         )
                     }
                 }
@@ -161,13 +198,135 @@ fun VideoGenerationScreen(
                 )
             }
             
+            // 状态信息
+            if (statusMessage.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(statusMessage)
+                        }
+                    }
+                }
+            }
+            
+            // 错误信息
+            if (errorMessage != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Error,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                errorMessage ?: "",
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // 生成完成
+            if (completedPath != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("✅ 视频生成完成！", fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "视频已保存至: $completedPath",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+            
             // 生成按钮
             item {
                 Button(
                     onClick = {
                         isGenerating = true
                         progress = 0f
-                        // TODO: 调用 VideoGenerationService
+                        statusMessage = "准备生成..."
+                        completedPath = null
+                        errorMessage = null
+                        
+                        scope.launch {
+                            try {
+                                val flow = videoEngine.generateText2Video(
+                                    prompt = prompt,
+                                    negativePrompt = negativePrompt,
+                                    duration = duration,
+                                    fps = fps,
+                                    resolution = resolution,
+                                    style = VideoEngine.STYLE_NORMAL,
+                                    motion = VideoEngine.MOTION_FLOAT
+                                )
+                                
+                                flow.collectLatest { progressState ->
+                                    when (progressState) {
+                                        is VideoProgress.Status -> {
+                                            statusMessage = progressState.message
+                                        }
+                                        is VideoProgress.Progress -> {
+                                            progress = progressState.progress
+                                            statusMessage = "生成中 ${(progressState.progress * 100).toInt()}%"
+                                        }
+                                        is VideoProgress.Completed -> {
+                                            completedPath = progressState.outputPath
+                                            isGenerating = false
+                                            statusMessage = "完成！"
+                                        }
+                                        is VideoProgress.Error -> {
+                                            errorMessage = progressState.message
+                                            isGenerating = false
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "生成失败: ${e.message}"
+                                isGenerating = false
+                            }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = prompt.isNotBlank() && !isGenerating,
@@ -189,6 +348,16 @@ fun VideoGenerationScreen(
                 }
             }
             
+            // 进度条
+            if (isGenerating && progress > 0) {
+                item {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            
             // 提示信息
             item {
                 Card(
@@ -202,10 +371,17 @@ fun VideoGenerationScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("• 视频生成需要较长时间，请耐心等待")
                         Text("• 建议使用英文提示词效果更好")
-                        Text("• 生成的视频保存在本地相册")
+                        Text("• 生成的视频保存在本地")
                     }
                 }
             }
+        }
+    }
+    
+    // 清理资源
+    DisposableEffect(Unit) {
+        onDispose {
+            videoEngine.release()
         }
     }
 }

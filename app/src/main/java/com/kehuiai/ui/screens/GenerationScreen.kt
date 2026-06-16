@@ -1,6 +1,7 @@
 package com.kehuiai.ui.screens
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -358,7 +359,13 @@ fun GenerationScreen(
                                         progress = s.percent / 100f
                                     }
                                     is GenerationProgress.Completed -> {
-                                        generatedImage = null // TODO: Load bitmap from path: ${s.imagePath}
+                                        generatedImage = s.paths.firstOrNull()?.let { path ->
+                                            try {
+                                                BitmapFactory.decodeFile(path)
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                        }
                                         isGenerating = false
                                     }
                                     is GenerationProgress.Error -> {

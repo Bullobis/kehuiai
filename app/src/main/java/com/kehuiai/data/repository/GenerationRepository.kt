@@ -233,6 +233,7 @@ class GenerationRepository(private val context: Context) {
         val currentList = _historyItems.value.toMutableList()
         currentList.add(0, item)
         _historyItems.value = currentList.take(MAX_HISTORY_ITEMS)
+        saveHistory()
     }
     
     suspend fun deleteHistoryItem(item: HistoryItem) {
@@ -251,9 +252,75 @@ class GenerationRepository(private val context: Context) {
             }
         }
         _historyItems.value = emptyList()
+        saveHistory()
     }
     
-    private fun loadHistory() {}
+    private fun loadHistory() {
+        try {
+            if (historyFile.exists()) {
+                val json = historyFile.readText()
+                val items = parseHistoryJson(json)
+                _historyItems.value = items.filter { item ->
+                    item.outputPaths.any { File(it).exists() } || item.status != HistoryStatus.COMPLETED
+                }
+                Log.i(TAG, "📜 已加载 ${_historyItems.value.size} 条历史记录")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 历史记录加载失败: ${e.message}")
+        }
+    }
+    
+    private fun parseHistoryJson(json: String): List<HistoryItem> {
+        if (json.isBlank()) return emptyList()
+        return try {
+            val items = mutableListOf<HistoryItem>()
+            val idRegex = """"id"\s*:\s*"([^"]+)"""".toRegex()
+            val timestampRegex = """"timestamp"\s*:\s*(\d+)""".toRegex()
+            val promptRegex = """"positivePrompt"\s*:\s*"([^"]+)"""".toRegex()
+            val statusRegex = """"status"\s*:\s*"([^"]+)"""".toRegex()
+            
+            val idMatches = idRegex.findAll(json).map { it.groupValues[1] }.toList()
+            val timestampMatches = timestampRegex.findAll(json).map { it.groupValues[1].toLong() }.toList()
+            val promptMatches = promptRegex.findAll(json).map { it.groupValues[1] }.toList()
+            val statusMatches = statusRegex.findAll(json).map { 
+                try { HistoryStatus.valueOf(it.groupValues[1]) } catch (e: Exception) { HistoryStatus.COMPLETED }
+            }.toList()
+            
+            for (i in idMatches.indices) {
+                val id = idMatches.getOrElse(i) { "history_$i" }
+                val timestamp = timestampMatches.getOrElse(i) { System.currentTimeMillis() }
+                val prompt = promptMatches.getOrElse(i) { "" }
+                val status = statusMatches.getOrElse(i) { HistoryStatus.COMPLETED }
+                
+                items.add(HistoryItem(
+                    id = id,
+                    timestamp = timestamp,
+                    params = GenerationParams(positivePrompt = prompt),
+                    outputPaths = emptyList(),
+                    status = status
+                ))
+            }
+            items
+        } catch (e: Exception) {
+            Log.e(TAG, "JSON解析失败: ${e.message}")
+            emptyList()
+        }
+    }
+    
+    private fun saveHistory() {
+        try {
+            val sb = StringBuilder()
+            sb.append("[")
+            _historyItems.value.take(MAX_HISTORY_ITEMS).forEachIndexed { index, item ->
+                if (index > 0) sb.append(",")
+                sb.append("{\"id\":\"${item.id}\",\"timestamp\":${item.timestamp},\"positivePrompt\":\"${item.params.positivePrompt}\",\"status\":\"${item.status.name}\"}") 
+            }
+            sb.append("]")
+            historyFile.writeText(sb.toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 历史记录保存失败: ${e.message}")
+        }
+    }
     
     fun release() {}
 }

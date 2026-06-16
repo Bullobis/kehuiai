@@ -106,13 +106,19 @@ class PromptGallery(private val context: Context) {
             val userPrompts = mutableListOf<PromptItem>()
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
-                userPrompts.add(PromptItem(
+                val tagsList = mutableListOf<String>()
+                    obj.optJSONArray("tags")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            tagsList.add(arr.getString(i))
+                        }
+                    }
+                    userPrompts.add(PromptItem(
                     obj.getString("id"),
                     obj.getString("title"),
                     obj.getString("prompt"),
                     obj.optString("negativePrompt", ""),
                     obj.optString("category", "通用"),
-                    obj.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+                    tagsList.ifEmpty { emptyList() },
                     obj.optString("author", "我"),
                     obj.optInt("likes", 0),
                     obj.optInt("uses", 0),
