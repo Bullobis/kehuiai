@@ -30,7 +30,11 @@ fun ModelSelectionScreen(
                 title = { Text("选择模型") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack, 
+                            contentDescription = "返回",
+                            modifier = Modifier
+                        )
                     }
                 }
             )
