@@ -75,7 +75,7 @@ fun GenerationScreen(
                         fontWeight = FontWeight.Bold
                     )
                 },
-                colors = TopAppBarDefaults.smallTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
@@ -384,7 +384,6 @@ fun GenerationScreen(
                                     is GenerationProgress.RefinerProgress -> {
                                         // Refiner progress
                                     }
-                                    else -> { /* Unknown progress type */ }
                                 }
                             }
                         }

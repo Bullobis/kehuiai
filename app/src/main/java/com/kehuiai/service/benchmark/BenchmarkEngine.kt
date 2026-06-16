@@ -79,7 +79,8 @@ class BenchmarkEngine(private val context: Context) {
                 val roundResults = mutableListOf<Double>()
                 
                 for (round in 0 until BENCHMARK_ROUNDS) {
-                    val (timeMs, memoryMb) = benchmarkRun(engine, testPrompt, testNegativePrompt)
+                    val result = benchmarkRun(engine, testPrompt, testNegativePrompt)
+                    val timeMs = result.first
                     roundResults.add(timeMs)
                     
                     emit(BenchmarkProgress.Progress(
@@ -293,7 +294,7 @@ class BenchmarkEngine(private val context: Context) {
         }
         
         // 分析内存泄漏
-        val analysis = analyzeMemory(memoryReadings)
+        @Suppress("UNUSED_VARIABLE") val analysis = analyzeMemory(memoryReadings)
         
         emit(BenchmarkProgress.Completed(
             listOf(
@@ -316,11 +317,11 @@ class BenchmarkEngine(private val context: Context) {
     // ==================== 内部方法 ====================
 
     private suspend fun warmupRun(
-        engine: InferenceEngine,
-        prompt: String,
-        negativePrompt: String,
-        width: Int = TEST_IMAGE_SIZE,
-        height: Int = TEST_IMAGE_SIZE
+        @Suppress("UNUSED_VARIABLE") engine: InferenceEngine,
+        @Suppress("UNUSED_PARAMETER") prompt: String,
+        @Suppress("UNUSED_PARAMETER") negativePrompt: String,
+        @Suppress("UNUSED_PARAMETER") width: Int = TEST_IMAGE_SIZE,
+        @Suppress("UNUSED_PARAMETER") height: Int = TEST_IMAGE_SIZE
     ) = withContext(Dispatchers.Default) {
         try {
             // 创建测试位图
@@ -337,11 +338,11 @@ class BenchmarkEngine(private val context: Context) {
 
     private suspend fun benchmarkRun(
         engine: InferenceEngine,
-        prompt: String,
-        negativePrompt: String,
-        width: Int = TEST_IMAGE_SIZE,
-        height: Int = TEST_IMAGE_SIZE,
-        steps: Int = TEST_STEPS
+        @Suppress("UNUSED_PARAMETER") prompt: String,
+        @Suppress("UNUSED_PARAMETER") negativePrompt: String,
+        @Suppress("UNUSED_PARAMETER") width: Int = TEST_IMAGE_SIZE,
+        @Suppress("UNUSED_PARAMETER") height: Int = TEST_IMAGE_SIZE,
+        @Suppress("UNUSED_PARAMETER") steps: Int = TEST_STEPS
     ): Pair<Double, Double> = withContext(Dispatchers.Default) {
         val startTime = SystemClock.uptimeMillis()
         val startMemory = getCurrentMemoryUsage()

@@ -188,7 +188,7 @@ class GestureHelper(
  */
 @Composable
 fun Modifier.gestureHandler(
-    onTap: (Int) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onTap: (Int) -> Unit = {},
     onDoubleTap: (Offset) -> Unit = {},
     onLongPress: (Offset) -> Unit = {},
     onScale: (Float, Offset) -> Unit = { _, _ -> },
@@ -265,7 +265,7 @@ fun ZoomableImage(
     Box(
         modifier = modifier
             .pointerInput(Unit) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
+                detectTransformGestures { _, pan, zoom, _ ->
                     scale = (scale * zoom).coerceIn(1f, 5f)
                     offset = if (scale > 1f) {
                         Offset(

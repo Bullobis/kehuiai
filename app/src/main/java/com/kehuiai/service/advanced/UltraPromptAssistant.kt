@@ -295,7 +295,7 @@ class UltraPromptAssistant(private val context: Context) {
     /**
      * 翻译提示词
      */
-    fun translatePrompt(prompt: String, toLanguage: String): String {
+    fun translatePrompt(prompt: String, @Suppress("UNUSED_PARAMETER") toLanguage: String): String {
         // 简化翻译（实际应该调用翻译API）
         val translations = mapOf(
             "beautiful" to "美丽",

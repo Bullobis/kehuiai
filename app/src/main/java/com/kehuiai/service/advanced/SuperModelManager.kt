@@ -917,7 +917,7 @@ class SuperModelManager(private val context: Context) {
                 model.description.lowercase().contains(q) ||
                 model.tags.any { it.lowercase().contains(q) } ||
                 model.author.lowercase().contains(q)
-            val matchCategory = category == null || getModelsByCategory(category).contains(model)
+            @Suppress("UNUSED_VARIABLE") val matchCategory = category == null || getModelsByCategory(category).contains(model)
             val matchType = type == null || model.type == type
             val matchBase = baseModel == null || model.baseModel == baseModel
             

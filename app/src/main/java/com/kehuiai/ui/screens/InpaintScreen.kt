@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,18 +47,18 @@ fun InpaintScreen(
                 title = { Text("局部重绘") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 },
                 actions = {
                     IconButton(onClick = { isErasing = !isErasing }) {
                         Icon(
-                            if (isErasing) Icons.Default.RestoreFromTrash else Icons.Default.Brush,
+                            if (isErasing) Icons.Default.Delete else Icons.Default.Edit,
                             contentDescription = "切换模式"
                         )
                     }
                     IconButton(onClick = { paths.clear() }) {
-                        Icon(Icons.Default.Clear, contentDescription = "清除")
+                        Icon(Icons.Default.Refresh, contentDescription = "清除")
                     }
                 }
             )
@@ -177,7 +178,7 @@ fun InpaintScreen(
                     .padding(16.dp),
                 enabled = paths.isNotEmpty() && originalBitmap != null
             ) {
-                Icon(Icons.Default.AutoFixHigh, contentDescription = null)
+                Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("应用重绘")
             }
@@ -192,6 +193,9 @@ private data class DrawPath(
     val isErase: Boolean = false
 )
 
-private fun createInpaintedResult(bitmap: Bitmap, paths: List<DrawPath>): Bitmap {
+private fun createInpaintedResult(
+    bitmap: Bitmap, 
+    @Suppress("UNUSED_PARAMETER") paths: List<DrawPath>
+): Bitmap {
     return bitmap.copy(Bitmap.Config.ARGB_8888, true)
 }

@@ -401,7 +401,7 @@ class ProfessionalInferenceEngine(private val context: Context) {
 
             val seed = if (validatedParams.seed < 0) Random.nextLong() else validatedParams.seed
             val totalSteps = validatedParams.steps
-            val guidanceScale = validatedParams.guidanceScale
+            @Suppress("UNUSED_VARIABLE") val guidanceScale = validatedParams.guidanceScale
 
             val batchSize = validatedParams.batchSize.coerceIn(1, MAX_BATCH_SIZE)
             val results = mutableListOf<Bitmap>()
@@ -523,7 +523,7 @@ class ProfessionalInferenceEngine(private val context: Context) {
     // ========== 验证参数 ==========
 
     private fun validateParams(params: GenerationParams, mode: GenMode): GenerationParams {
-        val memory = getMemoryInfo()
+        @Suppress("UNUSED_VARIABLE") val memory = getMemoryInfo()
 
         val validatedMode = when (mode) {
             GenMode.TXT2IMG -> com.kehuiai.data.model.GenerationMode.TXT2IMG

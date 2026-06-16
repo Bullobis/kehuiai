@@ -51,7 +51,7 @@ class ExportManager(private val context: Context) {
         outputPath: String? = null,
         format: String = FORMAT_PNG,
         quality: Int = QUALITY_HIGH,
-        metadata: ExportMetadata? = null
+        @Suppress("UNUSED_PARAMETER") metadata: ExportMetadata? = null
     ): Flow<ExportProgress> = flow {
         emit(ExportProgress.Status("开始导出..."))
 

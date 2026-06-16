@@ -494,15 +494,18 @@ class CompleteInferenceEngine(private val context: Context) {
         Log.i(TAG, "🔧 加载 LoRA: ${inputs["lora_name"]}")
     }
     
-    private fun loadControlNet(inputs: Map<String, Any>) {
+    private fun loadControlNet(@Suppress("UNUSED_PARAMETER") inputs: Map<String, Any>) {
         Log.i(TAG, "🎛️ 加载 ControlNet: ${inputs["control_net_name"]}")
     }
     
-    private suspend fun executeSampler(inputs: Map<String, Any>, params: GenerationParams) {
+    private suspend fun executeSampler(
+        @Suppress("UNUSED_PARAMETER") inputs: Map<String, Any>, 
+        @Suppress("UNUSED_PARAMETER") params: GenerationParams
+    ) {
         Log.i(TAG, "⚡ 执行采样...")
     }
     
-    private suspend fun executeUpscale(inputs: Map<String, Any>) {
+    private suspend fun executeUpscale(@Suppress("UNUSED_PARAMETER") inputs: Map<String, Any>) {
         Log.i(TAG, "🔍 执行超分...")
     }
     
@@ -668,7 +671,7 @@ class CompleteInferenceEngine(private val context: Context) {
             return """{"id":"${workflow.id}","name":"${workflow.name}","nodes":${workflow.nodes.size}}"""
         }
         
-        fun importWorkflow(json: String): CustomWorkflow? {
+        fun importWorkflow(@Suppress("UNUSED_PARAMETER") json: String): CustomWorkflow? {
             // 解析 JSON
             return null
         }

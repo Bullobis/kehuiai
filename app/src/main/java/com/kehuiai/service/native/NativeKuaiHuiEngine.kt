@@ -268,8 +268,8 @@ class NativeKehuiAIEngine private constructor(
             val resultBytes = nativeUpscale(imageBytes, scale, method)
             
             if (resultBytes != null) {
-                val newWidth = inputImage.width * scale
-                val newHeight = inputImage.height * scale
+                @Suppress("UNUSED_VARIABLE") val newWidth = inputImage.width * scale
+                @Suppress("UNUSED_VARIABLE") val newHeight = inputImage.height * scale
                 val bitmap = BitmapFactory.decodeByteArray(resultBytes, 0, resultBytes.size)
                 if (bitmap != null) {
                     emit(LDGenerationProgress.Completed(bitmap))

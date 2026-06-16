@@ -97,7 +97,7 @@ class AudioEngine(private val context: Context) {
         try {
             // 分词处理
             val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
-            val totalWords = words.size
+            @Suppress("UNUSED_VARIABLE") val totalWords = words.size
             
             emit(AudioProgress.Progress(0, "准备合成..."))
 
@@ -163,7 +163,7 @@ class AudioEngine(private val context: Context) {
                 val freq = baseFreq * pitch
                 
                 // 振动效果
-                val vibratoOffset = if (vibrato) sin(t * 5 * 2 * PI) * 10 else 0.0
+                @Suppress("UNUSED_VARIABLE") val vibratoOffset = if (vibrato) sin(t * 5 * 2 * PI) * 10 else 0.0
                 
                 // 生成复合波形
                 var sample = 0.0

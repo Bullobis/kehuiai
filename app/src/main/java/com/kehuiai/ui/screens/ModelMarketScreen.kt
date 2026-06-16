@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,7 +25,7 @@ import com.kehuiai.service.ModelDownloadService
 @Composable
 fun ModelMarketScreen(
     repository: ModelRepository,
-    onDownloadClick: (SDModel) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onDownloadClick: (SDModel) -> Unit,
     onNavigateBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -48,7 +49,7 @@ fun ModelMarketScreen(
                 navigationIcon = {
                     if (onNavigateBack != null) {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                         }
                     }
                 }

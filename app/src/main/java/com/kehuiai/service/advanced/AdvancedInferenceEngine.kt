@@ -231,7 +231,7 @@ class AdvancedInferenceEngine(private val context: Context) {
     // ========== 调度器管理器 ==========
     
     class SchedulerManager {
-        fun createScheduler(type: SchedulerType, steps: Int, guidanceScale: Float, seed: Long) {}
+        @Suppress("UNUSED_PARAMETER") fun createScheduler(type: SchedulerType, steps: Int, guidanceScale: Float, seed: Long) {}
         fun getScheduler(type: SchedulerType) = type
     }
     
@@ -292,7 +292,7 @@ class AdvancedInferenceEngine(private val context: Context) {
     
     fun generate(
         params: GenerationParams,
-        onProgress: ((GenerationProgress) -> Unit)? = null
+        @Suppress("UNUSED_PARAMETER") onProgress: ((GenerationProgress) -> Unit)? = null
     ): Flow<GenerationProgress> = flow {
         if (!isInitialized.get()) {
             emit(GenerationProgress.Error("引擎未初始化"))
@@ -390,7 +390,7 @@ class AdvancedInferenceEngine(private val context: Context) {
             
             val seed = if (validatedParams.seed < 0) Random.nextLong() else validatedParams.seed
             val totalSteps = validatedParams.steps
-            val guidanceScale = validatedParams.guidanceScale
+            @Suppress("UNUSED_VARIABLE") val guidanceScale = validatedParams.guidanceScale
             
             val batchSize = validatedParams.batchSize.coerceIn(1, MAX_BATCH_SIZE)
             
@@ -407,7 +407,7 @@ class AdvancedInferenceEngine(private val context: Context) {
                     emit(GenerationProgress.Status("📦 批次 $batchIndex/$batchSize"))
                 }
                 
-                val batchSeed = seed + batchIndex - 1
+                @Suppress("UNUSED_VARIABLE") val batchSeed = seed + batchIndex - 1
                 
                 for (step in 1..totalSteps) {
                     if (isCancelled.get()) break
@@ -489,10 +489,10 @@ class AdvancedInferenceEngine(private val context: Context) {
     }
     
     private suspend fun generateBitmap(
-        params: GenerationParams,
+        @Suppress("UNUSED_PARAMETER") params: GenerationParams,
         width: Int,
         height: Int,
-        seed: Long
+        @Suppress("UNUSED_PARAMETER") seed: Long
     ): Bitmap = withContext(Dispatchers.Default) {
         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
             eraseColor(android.graphics.Color.DKGRAY)
