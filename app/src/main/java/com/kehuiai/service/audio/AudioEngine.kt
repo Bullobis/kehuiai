@@ -45,6 +45,10 @@ class AudioEngine(private val context: Context) {
     private var currentPitch = 1.0f
     private var currentVolume = 1.0f
     
+    // 音频播放器引用（用于资源管理）
+    @Volatile
+    private var currentPlayer: AudioTrack? = null
+    
     // 音频目录
     private val audioDir = File(context.filesDir, "audio")
     private val ttsDir = File(audioDir, "tts")
@@ -311,7 +315,11 @@ class AudioEngine(private val context: Context) {
     /**
      * 播放音频
      */
+    @Synchronized
     fun play(audioData: ShortArray, sampleRate: Int = SAMPLE_RATE) {
+        // 先停止之前的播放
+        stop()
+        
         val bufferSize = AudioTrack.getMinBufferSize(
             sampleRate,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -336,6 +344,9 @@ class AudioEngine(private val context: Context) {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
 
+        // 保存引用以便后续控制
+        currentPlayer = audioTrack
+        
         audioTrack.write(audioData, 0, audioData.size)
         audioTrack.play()
     }
@@ -343,8 +354,27 @@ class AudioEngine(private val context: Context) {
     /**
      * 停止播放
      */
+    @Synchronized
     fun stop() {
-        // 需要保存 AudioTrack 引用才能停止
+        currentPlayer?.let { player ->
+            try {
+                if (player.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                    player.stop()
+                }
+                player.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping audio: ${e.message}")
+            }
+        }
+        currentPlayer = null
+    }
+    
+    /**
+     * 释放所有资源
+     */
+    @Synchronized
+    fun release() {
+        stop()
     }
 
     /**
