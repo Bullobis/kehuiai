@@ -1306,25 +1306,25 @@ std::map<std::string, float> InferenceEngine::getPerformanceStats() {
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeCreate(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeCreate(JNIEnv* env, jobject thiz) {
     LOGI("Creating native inference engine...");
     return reinterpret_cast<jlong>(new InferenceEngine());
 }
 
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeDestroy(JNIEnv* env, jobject thiz, jlong ptr) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeDestroy(JNIEnv* env, jobject thiz, jlong ptr) {
     LOGI("Destroying native inference engine...");
     delete reinterpret_cast<InferenceEngine*>(ptr);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeInit(JNIEnv* env, jobject thiz, jlong ptr, jint engineType) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeInit(JNIEnv* env, jobject thiz, jlong ptr, jint engineType) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     return engine ? engine->init(static_cast<EngineType>(engineType)) : JNI_FALSE;
 }
 
 JNIEXPORT jint JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeGetAvailableEngines(JNIEnv* env, jobject thiz, jlong ptr) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeGetAvailableEngines(JNIEnv* env, jobject thiz, jlong ptr) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (!engine) return 0;
     
@@ -1337,7 +1337,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeGetAvailableEngines(JNIEnv
 }
 
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeSetEngine(JNIEnv* env, jobject thiz, jlong ptr, jint engineType) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeSetEngine(JNIEnv* env, jobject thiz, jlong ptr, jint engineType) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (engine) {
         engine->setEngine(static_cast<EngineType>(engineType));
@@ -1345,7 +1345,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeSetEngine(JNIEnv* env, job
 }
 
 JNIEXPORT jint JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeDetectModelFormat(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeDetectModelFormat(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (!engine) return 0;
     
@@ -1357,7 +1357,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeDetectModelFormat(JNIEnv* 
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeLoadModel(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath, jint format) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeLoadModel(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath, jint format) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (!engine) return JNI_FALSE;
 
@@ -1369,7 +1369,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeLoadModel(JNIEnv* env, job
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeLoadModelBundle(JNIEnv* env, jobject thiz, jlong ptr, jstring basePath) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeLoadModelBundle(JNIEnv* env, jobject thiz, jlong ptr, jstring basePath) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (!engine) return JNI_FALSE;
     
@@ -1381,7 +1381,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeLoadModelBundle(JNIEnv* en
 }
 
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeUnloadModel(JNIEnv* env, jobject thiz, jlong ptr) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeUnloadModel(JNIEnv* env, jobject thiz, jlong ptr) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (engine) {
         engine->unloadModel();
@@ -1389,13 +1389,13 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeUnloadModel(JNIEnv* env, j
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeIsModelLoaded(JNIEnv* env, jobject thiz, jlong ptr) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeIsModelLoaded(JNIEnv* env, jobject thiz, jlong ptr) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     return (engine && engine->isModelLoaded()) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeLoadLora(JNIEnv* env, jobject thiz, jlong ptr, jstring loraPath, jfloat strength) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeLoadLora(JNIEnv* env, jobject thiz, jlong ptr, jstring loraPath, jfloat strength) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (!engine) return JNI_FALSE;
     
@@ -1407,7 +1407,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeLoadLora(JNIEnv* env, jobj
 }
 
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeUnloadLora(JNIEnv* env, jobject thiz, jlong ptr, jstring loraPath) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeUnloadLora(JNIEnv* env, jobject thiz, jlong ptr, jstring loraPath) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (engine) {
         const char* path = env->GetStringUTFChars(loraPath, nullptr);
@@ -1417,7 +1417,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeUnloadLora(JNIEnv* env, jo
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateText2Image(
+Java_com_kehuiai_service_NativeInferenceEngine_nativeGenerateText2Image(
     JNIEnv* env, jobject thiz, jlong ptr,
     jstring prompt, jstring negativePrompt,
     jint width, jint height, jint steps, jfloat cfgScale, jlong seed, jstring scheduler,
@@ -1458,7 +1458,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateText2Image(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateImage2Image(
+Java_com_kehuiai_service_NativeInferenceEngine_nativeGenerateImage2Image(
     JNIEnv* env, jobject thiz, jlong ptr,
     jintArray inputPixels,
     jstring prompt, jstring negativePrompt,
@@ -1507,7 +1507,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateImage2Image(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateInpaint(
+Java_com_kehuiai_service_NativeInferenceEngine_nativeGenerateInpaint(
     JNIEnv* env, jobject thiz, jlong ptr,
     jintArray inputPixels, jintArray maskPixels,
     jstring prompt, jstring negativePrompt,
@@ -1557,7 +1557,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateInpaint(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateUpscale(
+Java_com_kehuiai_service_NativeInferenceEngine_nativeGenerateUpscale(
     JNIEnv* env, jobject thiz, jlong ptr,
     jintArray inputPixels,
     jint width, jint height, jint scale,
@@ -1581,7 +1581,7 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeGenerateUpscale(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeConvertModel(
+Java_com_kehuiai_service_NativeInferenceEngine_nativeConvertModel(
     JNIEnv* env, jobject thiz, jlong ptr,
     jstring inputPath, jstring outputPath, jint targetFormat) {
     
@@ -1600,29 +1600,29 @@ Java_comkuaihuiai_service_NativeInferenceEngine_nativeConvertModel(
 }
 
 JNIEXPORT jstring JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeGetDeviceInfo(JNIEnv* env, jobject thiz, jlong ptr) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeGetDeviceInfo(JNIEnv* env, jobject thiz, jlong ptr) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     std::string info = engine ? engine->getDeviceInfo() : "Engine not initialized";
     return env->NewStringUTF(info.c_str());
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeIsQualcommSnapdragon(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeIsQualcommSnapdragon(JNIEnv* env, jobject thiz) {
     return InferenceEngine::isQualcommSnapdragon() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeHasNNAPI(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeHasNNAPI(JNIEnv* env, jobject thiz) {
     return InferenceEngine::hasNNAPI() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeIsNNAPIFast(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeIsNNAPIFast(JNIEnv* env, jobject thiz) {
     return InferenceEngine::isNNAPIFast() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_NativeInferenceEngine_nativeEnablePerformanceMode(JNIEnv* env, jobject thiz, jlong ptr, jboolean enable) {
+Java_com_kehuiai_service_NativeInferenceEngine_nativeEnablePerformanceMode(JNIEnv* env, jobject thiz, jlong ptr, jboolean enable) {
     auto engine = reinterpret_cast<InferenceEngine*>(ptr);
     if (engine) {
         engine->enablePerformanceMode(enable);

@@ -622,20 +622,20 @@ static std::unique_ptr<ModelManager> g_modelManager;
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeCreate(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeCreate(JNIEnv* env, jobject thiz) {
     LOGI("Creating ModelManager...");
     g_modelManager = std::make_unique<ModelManager>();
     return reinterpret_cast<jlong>(g_modelManager.get());
 }
 
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeDestroy(JNIEnv* env, jobject thiz, jlong ptr) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeDestroy(JNIEnv* env, jobject thiz, jlong ptr) {
     LOGI("Destroying ModelManager...");
     // 不要删除 g_modelManager，它在程序结束时自动清理
 }
 
 JNIEXPORT jint JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeDetectFormat(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeDetectFormat(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath) {
     auto mgr = reinterpret_cast<ModelManager*>(ptr);
     if (!mgr) return 0;
     
@@ -647,7 +647,7 @@ Java_comkuaihuiai_service_native_NativeModelManager_nativeDetectFormat(JNIEnv* e
 }
 
 JNIEXPORT jstring JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeFormatToString(JNIEnv* env, jobject thiz, jlong ptr, jint format) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeFormatToString(JNIEnv* env, jobject thiz, jlong ptr, jint format) {
     auto mgr = reinterpret_cast<ModelManager*>(ptr);
     if (!mgr) return env->NewStringUTF("");
     
@@ -656,7 +656,7 @@ Java_comkuaihuiai_service_native_NativeModelManager_nativeFormatToString(JNIEnv*
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeValidateModel(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath, jint format) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeValidateModel(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath, jint format) {
     auto mgr = reinterpret_cast<ModelManager*>(ptr);
     if (!mgr) return JNI_FALSE;
     
@@ -668,7 +668,7 @@ Java_comkuaihuiai_service_native_NativeModelManager_nativeValidateModel(JNIEnv* 
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeConvertModel(JNIEnv* env, jobject thiz, jlong ptr, jstring inputPath, jstring outputPath, jint targetFormat) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeConvertModel(JNIEnv* env, jobject thiz, jlong ptr, jstring inputPath, jstring outputPath, jint targetFormat) {
     auto mgr = reinterpret_cast<ModelManager*>(ptr);
     if (!mgr) return JNI_FALSE;
     
@@ -684,7 +684,7 @@ Java_comkuaihuiai_service_native_NativeModelManager_nativeConvertModel(JNIEnv* e
 }
 
 JNIEXPORT jboolean JNICALL
-Java_comkuaihuiai_service_native_NativeModelManager_nativeVerifyHash(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath, jstring expectedHash) {
+Java_com_kehuiai_service_native_NativeModelManager_nativeVerifyHash(JNIEnv* env, jobject thiz, jlong ptr, jstring modelPath, jstring expectedHash) {
     auto mgr = reinterpret_cast<ModelManager*>(ptr);
     if (!mgr) return JNI_FALSE;
     

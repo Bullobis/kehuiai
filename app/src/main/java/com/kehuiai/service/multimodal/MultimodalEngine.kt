@@ -355,7 +355,7 @@ class MultimodalEngine(private val context: Context) {
         
         // 基于文本生成背景
         val seed = text.hashCode()
-        val random = Random(seed.toLong())
+        @Suppress("UNUSED_VARIABLE") val random = Random(seed.toLong())
         
         val baseHue = (seed % 360).toFloat()
         

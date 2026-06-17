@@ -120,6 +120,7 @@ class ProBatchProcessor(private val context: Context) {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun processItem(task: BatchTask, inputPath: String, index: Int, config: BatchConfig): String? {
         val inputFile = File(inputPath)
         if (!inputFile.exists()) return null

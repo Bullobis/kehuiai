@@ -20,20 +20,20 @@ extern "C" {
 
 // 获取当前时间戳
 JNIEXPORT jlong JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeGetTimestamp(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeUtils_nativeGetTimestamp(JNIEnv* env, jobject thiz) {
     return static_cast<jlong>(std::time(nullptr));
 }
 
 // 生成随机种子
 JNIEXPORT jlong JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeGenerateSeed(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeUtils_nativeGenerateSeed(JNIEnv* env, jobject thiz) {
     std::srand(std::time(nullptr));
     return static_cast<jlong>(std::rand());
 }
 
 // 字符串哈希
 JNIEXPORT jint JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeHashString(JNIEnv* env, jobject thiz, jstring str) {
+Java_com_kehuiai_service_NativeUtils_nativeHashString(JNIEnv* env, jobject thiz, jstring str) {
     const char* s = env->GetStringUTFChars(str, nullptr);
     int hash = 0;
     while (*s) {
@@ -45,7 +45,7 @@ Java_comkuaihuiai_service_NativeUtils_nativeHashString(JNIEnv* env, jobject thiz
 
 // 拷贝像素数据
 JNIEXPORT void JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeCopyPixels(JNIEnv* env, jobject thiz,
+Java_com_kehuiai_service_NativeUtils_nativeCopyPixels(JNIEnv* env, jobject thiz,
     jintArray srcPixels, jintArray dstPixels, jint count) {
     
     jint* src = env->GetIntArrayElements(srcPixels, nullptr);
@@ -59,7 +59,7 @@ Java_comkuaihuiai_service_NativeUtils_nativeCopyPixels(JNIEnv* env, jobject thiz
 
 // 获取设备信息
 JNIEXPORT jstring JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeGetDeviceModel(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeUtils_nativeGetDeviceModel(JNIEnv* env, jobject thiz) {
     // 读取系统属性
     FILE* fp = fopen("/system/build.prop", "r");
     std::string model = "Unknown";
@@ -80,7 +80,7 @@ Java_comkuaihuiai_service_NativeUtils_nativeGetDeviceModel(JNIEnv* env, jobject 
 }
 
 JNIEXPORT jstring JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeGetDeviceManufacturer(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeUtils_nativeGetDeviceManufacturer(JNIEnv* env, jobject thiz) {
     FILE* fp = fopen("/system/build.prop", "r");
     std::string manufacturer = "Unknown";
     
@@ -101,7 +101,7 @@ Java_comkuaihuiai_service_NativeUtils_nativeGetDeviceManufacturer(JNIEnv* env, j
 
 // 内存操作
 JNIEXPORT jlong JNICALL
-Java_comkuaihuiai_service_NativeUtils_nativeGetAvailableMemory(JNIEnv* env, jobject thiz) {
+Java_com_kehuiai_service_NativeUtils_nativeGetAvailableMemory(JNIEnv* env, jobject thiz) {
     FILE* fp = fopen("/proc/meminfo", "r");
     long available = 0;
     
