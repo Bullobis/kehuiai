@@ -144,6 +144,7 @@ class ProVideoProcessor(private val context: Context) {
     }
 
     // ========== 添加水印 ==========
+    @Suppress("UNUSED_PARAMETER")
     suspend fun addWatermark(
         inputPath: String,
         outputPath: String,
@@ -170,6 +171,7 @@ class ProVideoProcessor(private val context: Context) {
     }
 
     // ========== 获取分辨率标签 ==========
+    @Suppress("UNUSED_PARAMETER")
     fun getResolutionLabel(width: Int, height: Int): String {
         return when {
             height >= 2160 -> "4K"

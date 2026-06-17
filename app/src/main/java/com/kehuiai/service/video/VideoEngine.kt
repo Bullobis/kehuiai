@@ -109,12 +109,12 @@ class VideoEngine(private val context: Context) {
     }
 
     fun generateText2Video(
-        prompt: String,
-        negativePrompt: String = "",
+        @Suppress("UNUSED_PARAMETER") prompt: String,
+        @Suppress("UNUSED_PARAMETER") negativePrompt: String = "",
         duration: Int = currentDuration,
         fps: Int = currentFrameRate,
         resolution: Int = currentResolution,
-        style: Int = currentStyle,
+        @Suppress("UNUSED_PARAMETER") style: Int = currentStyle,
         motion: String = currentMotion
     ): Flow<VideoProgress> = flow {
         isGenerating.set(true)
@@ -195,11 +195,11 @@ class VideoEngine(private val context: Context) {
 
     fun generateImage2Video(
         sourceImage: Bitmap,
-        prompt: String = "",
+        @Suppress("UNUSED_PARAMETER") prompt: String = "",
         duration: Int = currentDuration,
         fps: Int = currentFrameRate,
         resolution: Int = currentResolution,
-        style: Int = currentStyle,
+        @Suppress("UNUSED_PARAMETER") style: Int = currentStyle,
         motion: String = currentMotion,
         motionStrength: Float = 0.5f
     ): Flow<VideoProgress> = flow {
@@ -315,6 +315,7 @@ class VideoEngine(private val context: Context) {
         
     }.flowOn(Dispatchers.Default)
 
+    @Suppress("UNUSED_PARAMETER")
     fun upscaleVideo(
         sourcePath: String,
         scale: Int = 2,
@@ -389,6 +390,7 @@ class VideoEngine(private val context: Context) {
 
     data class MotionParams(val scaleX: Float, val scaleY: Float, val translateX: Float, val translateY: Float, val rotation: Float)
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun generateVideoFrame(
         prompt: String,
         width: Int,
@@ -428,6 +430,7 @@ class VideoEngine(private val context: Context) {
         bitmap
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun applyMotionToFrame(
         source: Bitmap,
         frameIndex: Int,
@@ -497,6 +500,7 @@ class VideoEngine(private val context: Context) {
         return result
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun applyGlitchStyle(source: Bitmap, strength: Float): Bitmap {
         val result = source.copy(source.config, true)
         val width = result.width
@@ -518,6 +522,7 @@ class VideoEngine(private val context: Context) {
         return result
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun applyCyberpunkStyle(source: Bitmap, strength: Float): Bitmap {
         val result = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
@@ -528,6 +533,7 @@ class VideoEngine(private val context: Context) {
         return result
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun applyDreamStyle(source: Bitmap, strength: Float): Bitmap {
         val result = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
@@ -539,6 +545,7 @@ class VideoEngine(private val context: Context) {
         return result
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun applyVintageStyle(source: Bitmap, strength: Float): Bitmap {
         val result = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
@@ -595,6 +602,7 @@ class VideoEngine(private val context: Context) {
             var muxerStarted = false
             val bufferInfo = MediaCodec.BufferInfo()
             
+            @Suppress("UNUSED_VARIABLE")
             for ((index, frame) in frames.withIndex()) {
                 val canvas = inputSurface.lockCanvas(null)
                 canvas.drawBitmap(frame, 0f, 0f, null)
@@ -663,12 +671,14 @@ class VideoEngine(private val context: Context) {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun extractFrames(videoPath: String): List<Bitmap> = withContext(Dispatchers.IO) {
         val frames = mutableListOf<Bitmap>()
         // 简化实现，实际应用中需要使用 MediaCodec/MediaExtractor
         frames
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun saveFrameToDisk(bitmap: Bitmap, index: Int) {
         val file = File(framesDir, "frame_${String.format("%06d", index)}.png")
         try {
