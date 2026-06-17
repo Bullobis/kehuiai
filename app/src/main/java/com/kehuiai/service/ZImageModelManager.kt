@@ -139,4 +139,13 @@ class ZImageModelManager private constructor(private val context: Context) {
         val info = _models.value[type] ?: return
         _models.value = _models.value + (type to info.copy(state = state))
     }
+    
+    /**
+     * 释放资源
+     */
+    fun release() {
+        downloadJob?.cancel()
+        scope.cancel()
+        INSTANCE = null
+    }
 }

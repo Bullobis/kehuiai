@@ -138,4 +138,13 @@ class VideoGenerationService private constructor(private val context: Context) {
     fun getOutputDirectory(): File {
         return File(context.filesDir, "videos").also { it.mkdirs() }
     }
+    
+    /**
+     * 释放资源
+     */
+    fun release() {
+        cancel()
+        scope.cancel()
+        INSTANCE = null
+    }
 }

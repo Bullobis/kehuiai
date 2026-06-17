@@ -548,4 +548,11 @@ class PerformanceOptimizer(private val context: Context) {
             appendLine("  电量: ${_performanceState.value.batteryLevel}%")
         }
     }
+    
+    /**
+     * v2.4.0 释放资源
+     */
+    fun release() {
+        stopMonitoring()
+    }
 }
