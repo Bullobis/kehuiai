@@ -108,6 +108,7 @@ class ProVideoProcessor(private val context: Context) {
     }
 
     // ========== 视频剪辑 ==========
+    @Suppress("UNUSED_PARAMETER")
     suspend fun trimVideo(
         inputPath: String,
         outputPath: String,
@@ -130,6 +131,7 @@ class ProVideoProcessor(private val context: Context) {
     }
 
     // ========== 视频压缩 ==========
+    @Suppress("UNUSED_PARAMETER")
     suspend fun compressVideo(
         inputPath: String,
         outputPath: String,
