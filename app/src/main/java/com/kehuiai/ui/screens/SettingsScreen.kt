@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -150,7 +151,7 @@ fun SettingsScreen(
                         ListItem(
                             headlineContent = { Text("💬 AI 对话") },
                             supportingContent = { Text("与 AI 助手聊天，获取创作灵感") },
-                            leadingContent = { Icon(Icons.Default.Chat, null) },
+                            leadingContent = { Icon(Icons.AutoMirrored.Filled.Chat, null) },
                             trailingContent = { Icon(Icons.Default.ChevronRight, null) },
                             modifier = Modifier.fillMaxWidth()
                         )

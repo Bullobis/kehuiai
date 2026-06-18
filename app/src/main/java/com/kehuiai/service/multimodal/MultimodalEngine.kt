@@ -529,6 +529,7 @@ class MultimodalEngine(private val context: Context) {
         paint.color = edgeColor
         
         // 填充边缘
+        @Suppress("UNUSED_VARIABLE")
         val canvas = Canvas(result)
         
         // 简化实现

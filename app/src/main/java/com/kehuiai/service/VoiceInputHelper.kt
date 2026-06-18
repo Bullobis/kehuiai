@@ -457,6 +457,7 @@ class VoiceInputHelper(private val context: Context) {
             }
         }
         
+        @Deprecated("Deprecated in Java")
         override fun onEvent(eventType: Int, params: Bundle?) {
             // 事件处理
         }

@@ -98,6 +98,7 @@ class ProVideoProcessor(private val context: Context) {
             val interval = 100 // 每100ms一帧
             var time = startTime
             while (time < endTime) {
+                @Suppress("UNUSED_VARIABLE")
                 val frame = extractFrame(inputPath, time)
                 time += interval
                 callback?.onProgress(((time - startTime) * 100 / (endTime - startTime)).toInt())
@@ -118,6 +119,7 @@ class ProVideoProcessor(private val context: Context) {
         callback: VideoCallback? = null
     ) = withContext(Dispatchers.IO) {
         try {
+            @Suppress("UNUSED_VARIABLE")
             val info = getVideoInfo(inputPath)
             var progress = 0
             while (progress <= 100) {

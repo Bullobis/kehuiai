@@ -541,6 +541,7 @@ class StyleTransferEngine(private val context: Context) {
         return result
     }
     
+    @Suppress("UNUSED_PARAMETER")
     private fun calculateSimilarity(original: Bitmap, styled: Bitmap): Float {
         // 简化：返回随机相似度
         return 0.75f + (System.currentTimeMillis() % 20) / 100f

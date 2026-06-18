@@ -172,6 +172,7 @@ class VAEManager(private val context: Context) {
     /**
      * FT-MAE 美化
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun applyFTMAE(input: Bitmap, strength: Float): Bitmap {
         val width = input.width
         val height = input.height
@@ -202,6 +203,7 @@ class VAEManager(private val context: Context) {
     /**
      * FT-MSE 美化
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun applyFTMSE(input: Bitmap, strength: Float): Bitmap {
         // MSE 优化，更平滑的结果
         val width = input.width
@@ -229,6 +231,7 @@ class VAEManager(private val context: Context) {
     /**
      * EMA 美化
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun applyEMA(input: Bitmap, strength: Float): Bitmap {
         // EMA 平滑，减少噪点
         val width = input.width
@@ -278,6 +281,7 @@ class VAEManager(private val context: Context) {
     /**
      * KL-F8 美化 (SDXL VAE)
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun applyKLF8(input: Bitmap, strength: Float): Bitmap {
         // SDXL 原生 VAE 效果
         val width = input.width
@@ -308,6 +312,7 @@ class VAEManager(private val context: Context) {
     /**
      * TAESD 美化 (快速预览)
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun applyTAESD(input: Bitmap, strength: Float): Bitmap {
         // TAESD 用于快速预览，轻微美化
         val width = input.width
@@ -333,6 +338,7 @@ class VAEManager(private val context: Context) {
     /**
      * 自定义 VAE 处理
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun applyCustomVAE(input: Bitmap, strength: Float): Bitmap {
         // 自定义 VAE 使用默认处理
         return applyEMA(input, strength)

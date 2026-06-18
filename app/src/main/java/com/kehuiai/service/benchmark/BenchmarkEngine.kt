@@ -168,7 +168,7 @@ class BenchmarkEngine(private val context: Context) {
      * 测试特定分辨率
      */
     fun benchmarkResolution(
-        engine: InferenceEngine,
+        @Suppress("UNUSED_VARIABLE") engine: InferenceEngine,
         resolutions: List<Pair<Int, Int>>
     ): Flow<BenchmarkProgress> = flow {
         emit(BenchmarkProgress.Status("分辨率测试"))
