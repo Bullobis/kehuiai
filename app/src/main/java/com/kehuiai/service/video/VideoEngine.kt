@@ -565,6 +565,7 @@ class VideoEngine(private val context: Context) {
         return result
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun generateColorScheme(prompt: String, seed: Int): ColorSchemeV2 {
         val hue = (seed % 360).toFloat()
         return ColorSchemeV2(

@@ -511,7 +511,7 @@ class PromptVersionManager(private val context: Context) {
                         timestamp = obj.getLong("timestamp"),
                         label = obj.optString("label", ""),
                         notes = obj.optString("notes", ""),
-                        parentVersion = obj.optInt("parentVersion", 0) ?: 0,
+                        parentVersion = obj.optInt("parentVersion", 0),
                         tags = obj.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
                         isFavorite = obj.optBoolean("isFavorite", false),
                         isCurrent = obj.optBoolean("isCurrent", true)

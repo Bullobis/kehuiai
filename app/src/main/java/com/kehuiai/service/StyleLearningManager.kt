@@ -76,7 +76,9 @@ class StyleLearningManager private constructor(private val context: Context) {
     private val _styleHistory = MutableStateFlow<List<StyleRecord>>(emptyList())
     val styleHistory: StateFlow<List<StyleRecord>> = _styleHistory.asStateFlow()
     
-    private lateinit var prefs: SharedPreferences
+    private val prefs: SharedPreferences by lazy {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     
     // 风格维度说明
@@ -96,7 +98,6 @@ class StyleLearningManager private constructor(private val context: Context) {
     )
     
     init {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         loadFromPrefs()
         updateRecommendations()
     }
@@ -124,7 +125,7 @@ class StyleLearningManager private constructor(private val context: Context) {
             timestamp = System.currentTimeMillis(),
             features = features,
             feedback = feedback,
-            modelType = params.baseModel.name ?: "UNKNOWN",
+            modelType = params.baseModel.name,
             style = "default",
             seed = params.seed
         )
@@ -218,7 +219,7 @@ class StyleLearningManager private constructor(private val context: Context) {
         }
         
         // 正则词
-        val negPrompt = params.negativePrompt?.lowercase() ?: ""
+        val negPrompt = params.negativePrompt.lowercase()
         if (negPrompt.contains("cartoon") || negPrompt.contains("anime")) {
             features[0] = (features[0] + 0.2f).coerceAtMost(1f) // 更真实
         }

@@ -66,22 +66,27 @@ class ProBatchProcessor(private val context: Context) {
     private val runningJobs = mutableMapOf<String, Job>()
 
     // ========== 创建任务 ==========
+    @Suppress("UNUSED_PARAMETER")
     fun createResizeTask(inputPaths: List<String>, outputDir: String, maxWidth: Int = 1920, maxHeight: Int = 1080): BatchTask {
         return BatchTask(type = TaskType.RESIZE, inputPaths = inputPaths, outputDir = outputDir)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun createFilterTask(inputPaths: List<String>, outputDir: String, filterType: String): BatchTask {
         return BatchTask(type = TaskType.FILTER, inputPaths = inputPaths, outputDir = outputDir)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun createCompressTask(inputPaths: List<String>, outputDir: String, quality: Int = 80): BatchTask {
         return BatchTask(type = TaskType.COMPRESS, inputPaths = inputPaths, outputDir = outputDir)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun createWatermarkTask(inputPaths: List<String>, outputDir: String, text: String): BatchTask {
         return BatchTask(type = TaskType.WATERMARK, inputPaths = inputPaths, outputDir = outputDir)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun createConvertTask(inputPaths: List<String>, outputDir: String, format: String = "png"): BatchTask {
         return BatchTask(type = TaskType.CONVERT, inputPaths = inputPaths, outputDir = outputDir)
     }

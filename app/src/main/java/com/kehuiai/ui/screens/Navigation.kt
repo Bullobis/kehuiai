@@ -15,7 +15,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kehuiai.data.repository.GenerationRepository
 import com.kehuiai.navigation.Screen
-import com.kehuiai.ui.theme.KehuiAITheme
 
 /**
  * 可绘AI v3.0 导航组件
@@ -75,7 +74,7 @@ fun MainNavigation(repository: GenerationRepository) {
                 ModelsScreen(repository = repository)
             }
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(navController = navController)
             }
         }
     }

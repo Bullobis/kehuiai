@@ -13,11 +13,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.kehuiai.navigation.Screen
 import com.kehuiai.service.SettingsManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    navController: NavController? = null
+) {
     val context = LocalContext.current
     val settingsManager = remember { SettingsManager.getInstance(context) }
     
@@ -128,6 +133,82 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 }
             }
             
+            // 快捷入口
+            item {
+                Text(
+                    "🚀 快捷入口",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+            
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        // AI 对话
+                        ListItem(
+                            headlineContent = { Text("💬 AI 对话") },
+                            supportingContent = { Text("与 AI 助手聊天，获取创作灵感") },
+                            leadingContent = { Icon(Icons.Default.Chat, null) },
+                            trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        HorizontalDivider()
+                        
+                        // 提示词助手
+                        ListItem(
+                            headlineContent = { Text("✨ 提示词助手") },
+                            supportingContent = { Text("优化和翻译提示词") },
+                            leadingContent = { Icon(Icons.Default.AutoFixHigh, null) },
+                            trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        HorizontalDivider()
+                        
+                        // 画廊
+                        ListItem(
+                            headlineContent = { Text("🖼️ 提示词画廊") },
+                            supportingContent = { Text("浏览和收藏优秀提示词") },
+                            leadingContent = { Icon(Icons.Default.PhotoLibrary, null) },
+                            trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+            
+            // AI 设置
+            item {
+                Text(
+                    "🤖 AI 对话设置",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+            
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("AI 提供商", fontWeight = FontWeight.Bold)
+                        Text(
+                            "当前: 通义千问 (qwen2.5-7b-instruct)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { navController?.navigate(Screen.AISettings.route) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Settings, null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("配置 AI 设置")
+                        }
+                    }
+                }
+            }
+            
             // 网络设置
             item {
                 Text(
@@ -229,11 +310,17 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text("🎨 可绘AI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("版本 3.6.0", style = MaterialTheme.typography.bodyMedium)
+                        Text("版本 3.6.3", style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "内置高性能图像生成引擎",
                             style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "开源地址: github.com/Bullobis/kehuiai",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }

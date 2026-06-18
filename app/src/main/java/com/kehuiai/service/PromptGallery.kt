@@ -123,7 +123,7 @@ class PromptGallery(private val context: Context) {
                     obj.optInt("likes", 0),
                     obj.optInt("uses", 0),
                     obj.optDouble("rating", 0.0).toFloat(),
-                    obj.optString("imageUrl", null),
+                    obj.optString("imageUrl", ""),
                     obj.optLong("createdAt", System.currentTimeMillis())
                 ))
             }

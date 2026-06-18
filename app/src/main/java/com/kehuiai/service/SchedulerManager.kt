@@ -78,11 +78,11 @@ class SchedulerManager(private val context: Context) {
         schedulerType: String,
         steps: Int = 20,
         guidanceScale: Float = 7f,
-       eta: Float = 0f,
-        s_churn: Float = 0f,
-        s_tmin: Float = 0f,
-        s_tmax: Float = Float.POSITIVE_INFINITY,
-        s_noise: Float = 1f
+        eta: Float = 0f,
+        @Suppress("UNUSED_PARAMETER") s_churn: Float = 0f,
+        @Suppress("UNUSED_PARAMETER") s_tmin: Float = 0f,
+        @Suppress("UNUSED_PARAMETER") s_tmax: Float = Float.POSITIVE_INFINITY,
+        @Suppress("UNUSED_PARAMETER") s_noise: Float = 1f
     ): SchedulerConfig {
         
         val config = when (schedulerType) {

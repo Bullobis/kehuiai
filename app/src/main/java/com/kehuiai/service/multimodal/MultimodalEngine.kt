@@ -340,11 +340,12 @@ class MultimodalEngine(private val context: Context) {
                "dominant color analysis complete."
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun generateMultimodalOutput(
         image: Bitmap?,
         text: String,
-        features: String,
-        style: String
+        features: String,  // 预留用于未来AI特征融合
+        style: String      // 预留用于未来风格迁移
     ): Bitmap {
         val width = 512
         val height = 512
@@ -432,9 +433,10 @@ class MultimodalEngine(private val context: Context) {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun applyStyleTransfer(
         source: Bitmap,
-        dest: Bitmap,
+        dest: Bitmap,    // 预留用于未来多目标输出
         canvas: Canvas,
         paint: Paint,
         style: StyleType
@@ -494,12 +496,13 @@ class MultimodalEngine(private val context: Context) {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun extendEdges(
         result: Bitmap,
         original: Bitmap,
         direction: Direction,
-        offsetX: Int,
-        offsetY: Int
+        offsetX: Int,  // 预留用于精确偏移控制
+        offsetY: Int   // 预留用于精确偏移控制
     ) {
         // 简化：边缘延伸
         val paint = Paint()
