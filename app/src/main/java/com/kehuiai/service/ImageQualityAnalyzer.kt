@@ -1,3 +1,4 @@
+@file:Suppress("UNUSED_PARAMETER", "UNCHECKED_CAST", "DEPRECATION", "USELESS_ELVIS")
 /**
  * ImageQualityAnalyzer.kt
  * 图像质量分析引擎 - 无参考质量评估 (No-Reference IQA)

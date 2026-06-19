@@ -1,3 +1,4 @@
+@file:Suppress("UNUSED_PARAMETER", "UNCHECKED_CAST", "DEPRECATION", "USELESS_ELVIS")
 /**
  * SmartPromptSearchEngine.kt
  * 智能提示词搜索引擎 - 基于 TF-IDF + N-gram 的语义搜索

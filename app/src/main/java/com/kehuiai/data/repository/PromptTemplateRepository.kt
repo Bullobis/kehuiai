@@ -1,3 +1,4 @@
+@file:Suppress("UNUSED_PARAMETER", "UNCHECKED_CAST")
 package com.kehuiai.data.repository
 
 import android.content.Context

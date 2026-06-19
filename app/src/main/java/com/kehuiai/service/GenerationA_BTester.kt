@@ -1,3 +1,4 @@
+@file:Suppress("UNUSED_PARAMETER", "UNCHECKED_CAST", "DEPRECATION", "USELESS_ELVIS")
 /**
  * GenerationA_BTester.kt
  * 生成参数 A/B 测试框架

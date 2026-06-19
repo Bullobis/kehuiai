@@ -1,3 +1,4 @@
+@file:Suppress("UNUSED_PARAMETER", "UNCHECKED_CAST", "DEPRECATION", "USELESS_ELVIS")
 package com.kehuiai.service
 
 import android.graphics.Bitmap
