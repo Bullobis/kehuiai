@@ -82,6 +82,13 @@ fun MainNavigation(repository: GenerationRepository) {
             composable(Screen.Diagnostics.route) {
                 DiagnosticsScreen(navController = navController)
             }
+            composable(Screen.QualityAnalysis.route) { backStackEntry ->
+                val imagePath = backStackEntry.arguments?.getString("imagePath")
+                QualityAnalysisScreen(
+                    imagePath = imagePath,
+                    navController = navController
+                )
+            }
         }
     }
 }
