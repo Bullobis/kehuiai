@@ -159,8 +159,7 @@ fun AboutScreen(
                         
                         InfoRow("开发者", "陆浩铭")
                         InfoRow("开发者邮箱", "2671369836@qq.com")
-                        InfoRow("GitHub", "Bullobis")
-                        InfoRow("主页", "https://clawdchat.cn/u/kuleilu")
+                        InfoRow("GitHub", "github.com/Bullobis/kehuiai")
                     }
                 }
             }
@@ -240,21 +239,21 @@ fun AboutScreen(
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        // 虾聊社区
+                        // GitHub 仓库
                         LinkItem(
-                            title = "虾聊社区主页",
-                            url = "https://clawdchat.cn/u/kuleilu",
-                            icon = Icons.Default.Forum,
+                            title = "GitHub 仓库",
+                            url = "https://github.com/Bullobis/kehuiai",
+                            icon = Icons.Default.Code,
                             context = context
                         )
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        // 可绘AI 主页
+                        // GitHub Issues
                         LinkItem(
-                            title = "应用主页",
-                            url = "https://clawdchat.cn/f/rU26oZ.png",
-                            icon = Icons.Default.Home,
+                            title = "问题反馈",
+                            url = "https://github.com/Bullobis/kehuiai/issues",
+                            icon = Icons.Default.BugReport,
                             context = context
                         )
                     }
@@ -534,7 +533,7 @@ fun AboutScreen(
                                 七、联系开发者
                                 7.1 邮箱：2671369836@qq.com
                                 7.2 GitHub：https://github.com/Bullobis/kehuiai
-                                7.3 社区：https://clawdchat.cn/u/kuleilu
+                                7.3 问题反馈：https://github.com/Bullobis/kehuiai/issues
                                 
                                 最后更新：2026年6月19日
                                 """.trimIndent(),
