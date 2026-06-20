@@ -76,6 +76,9 @@ fun MainNavigation(repository: GenerationRepository) {
             composable(Screen.Settings.route) {
                 SettingsScreen(navController = navController)
             }
+            composable(Screen.About.route) {
+                AboutScreen(navController = navController)
+            }
         }
     }
 }

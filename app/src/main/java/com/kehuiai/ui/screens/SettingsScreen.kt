@@ -1,6 +1,7 @@
 package com.kehuiai.ui.screens
 
 import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -301,7 +302,9 @@ fun SettingsScreen(
             
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController?.navigate(Screen.About.route) },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
@@ -311,7 +314,7 @@ fun SettingsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text("🎨 可绘AI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("版本 3.6.3", style = MaterialTheme.typography.bodyMedium)
+                        Text("版本 3.6.5", style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "内置高性能图像生成引擎",
@@ -322,6 +325,12 @@ fun SettingsScreen(
                             "开源地址: github.com/Bullobis/kehuiai",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "👆 点击查看完整关于页面",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                         )
                     }
                 }

@@ -16,6 +16,7 @@ sealed class Screen(val route: String) {
     object Inpaint : Screen("inpaint")
     object ModelMarket : Screen("model_market")
     object ModelSelection : Screen("model_selection")
+    object About : Screen("about")
     
     companion object {
         val bottomNavItems = listOf(Generation, VideoGeneration, History, Models, Settings)
