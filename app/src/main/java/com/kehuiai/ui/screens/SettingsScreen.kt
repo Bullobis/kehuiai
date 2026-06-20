@@ -176,6 +176,16 @@ fun SettingsScreen(
                             trailingContent = { Icon(Icons.Default.ChevronRight, null) },
                             modifier = Modifier.fillMaxWidth()
                         )
+                        HorizontalDivider()
+                        
+                        // 使用统计
+                        ListItem(
+                            headlineContent = { Text("📊 使用统计") },
+                            supportingContent = { Text("查看生成记录和成就") },
+                            leadingContent = { Icon(Icons.Default.BarChart, null) },
+                            trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
